@@ -104,7 +104,7 @@ func (t *Trace) read_nth_level(path string, lines int, save Save, is_func bool) 
 
 					go t.new_walk(&trace)
 				} else {
-					result := fmt.Sprintf("%s %s defined in \x1b[31m%s@L%d\x1b[0m.",
+					result := fmt.Sprintf("%s \x1b[31m%s\x1b[0m defined in %s@L%d.",
 						h, t.callee.fun, path, lines)
 
 					callee := Callee{save.func_name, path, lines}
