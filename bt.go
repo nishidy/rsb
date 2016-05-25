@@ -191,17 +191,21 @@ func main() {
 		os.Exit(-1)
 	}
 
+	file := os.Args[1]
+
 	line, err := strconv.Atoi(os.Args[2])
 	if err != nil {
 		os.Exit(-2)
 	}
+
+	dir := os.Args[3]
 
 	maxlevel, err := strconv.Atoi(os.Args[4])
 	if err != nil {
 		os.Exit(-2)
 	}
 
-	entry := Entry{os.Args[1], line, os.Args[3]}
+	entry := Entry{file, line, dir}
 	callee := Callee{""}
 	trace := Trace{entry, callee, 1, maxlevel}
 
