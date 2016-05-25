@@ -128,7 +128,7 @@ func (t *Trace) read(path string) {
 			comment = true
 		}
 
-		if !comment || comment {
+		if !comment {
 
 			func_name := get_func_name(ln)
 			is_func := false
