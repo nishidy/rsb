@@ -78,6 +78,8 @@ func (t *Trace) read_nth_level(path string, lines int, save Save, is_func bool) 
 		// Skip if this line defines function
 	} else if t.callee.file == path && t.callee.line == lines {
 		// Skip if this line appears again
+	} else if t.maxlevel < t.level {
+		//
 	} else {
 		h := fmt.Sprintf("%s-%d-", strings.Repeat(" ", t.level-1), t.level)
 
@@ -93,26 +95,24 @@ func (t *Trace) read_nth_level(path string, lines int, save Save, is_func bool) 
 			path_slice := strings.Split(path, ".")
 			ext := path_slice[len(path_slice)-1]
 
-			if t.level <= t.maxlevel {
-				if ext == "c" {
-					result := fmt.Sprintf("%s %s %s@L%d in \x1b[34m%s\x1b[0m function scope.",
-						h, t.callee.fun, path, lines, save.func_name)
+			if ext == "c" {
+				result := fmt.Sprintf("%s %s %s@L%d in \x1b[34m%s\x1b[0m function scope.",
+					h, t.callee.fun, path, lines, save.func_name)
 
-					callee := Callee{save.func_name, path, lines}
-					trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
-					t.nodes = append(t.nodes, &trace)
+				callee := Callee{save.func_name, path, lines}
+				trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
+				t.nodes = append(t.nodes, &trace)
 
-					go t.new_walk(&trace)
-				} else {
-					result := fmt.Sprintf("%s \x1b[31m%s\x1b[0m defined in %s@L%d.",
-						h, t.callee.fun, path, lines)
+				go t.new_walk(&trace)
 
-					callee := Callee{save.func_name, path, lines}
-					trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
-					t.nodes = append(t.nodes, &trace)
-				}
+			} else {
+				result := fmt.Sprintf("%s \x1b[31m%s\x1b[0m defined in %s@L%d.",
+					h, t.callee.fun, path, lines)
+
+				callee := Callee{save.func_name, path, lines}
+				trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
+				t.nodes = append(t.nodes, &trace)
 			}
-
 		}
 	}
 
