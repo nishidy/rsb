@@ -6,6 +6,6 @@ This runs depth-first search for functions and show the backtrace tree.
 
 
 ```
-$ bt DIR ENTRYLINE ENTRYFILE MAXBACKTRACELEVEL
+$ bt ENTRYFILE ENTRYLINE ROOTDIR MAXBACKTRACELEVEL
 ```
 
