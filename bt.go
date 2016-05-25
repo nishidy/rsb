@@ -55,7 +55,7 @@ func (t *Trace) recur_visit(path string, info os.FileInfo, err error) error {
 
 func (t *Trace) read_fst_level(path string, lines int, save Save) {
 
-	fmt.Printf("-1- Entry point %s@L%d in %s function scope.\n",
+	fmt.Printf("-1- Entry point %s@L%d in \x1b[34%s\x1b[0m function scope.\n",
 		t.entry.file, t.entry.line, save.func_name)
 
 	entry := Entry{path, lines, t.entry.dir}
@@ -75,7 +75,7 @@ func (t *Trace) read_nth_level(path string, lines int, save Save, is_func bool) 
 		h := fmt.Sprintf("%s-%d-", strings.Repeat(" ", t.level-1), t.level)
 
 		if save.func_line < save.struct_line {
-			fmt.Printf("%s %s %s@L%d in %s struct scope.\n",
+			fmt.Printf("%s %s %s@L%d in \x1b[31%s\x1b[0m struct scope.\n",
 				h, t.callee.fun, path, lines, save.struct_name)
 		} else {
 
@@ -84,7 +84,7 @@ func (t *Trace) read_nth_level(path string, lines int, save Save, is_func bool) 
 
 			if t.level <= t.maxlevel {
 				if ext == "c" {
-					fmt.Printf("%s %s %s@L%d in %s function scope.\n",
+					fmt.Printf("%s %s %s@L%d in \x1b[34%s\x1b[0m function scope.\n",
 						h, t.callee.fun, path, lines, save.func_name)
 
 					entry := Entry{path, lines, t.entry.dir}
@@ -171,7 +171,7 @@ func (t *Trace) read(path string) {
 }
 
 func get_struct_name(ln string) []string {
-	re_struct, _ := regexp.Compile("\\w *\\w+ struct *(\\w+) *=")
+	re_struct, _ := regexp.Compile("^\\w+ *\\w+ struct +(\\w+) .*=")
 	return re_struct.FindStringSubmatch(ln)
 }
 
