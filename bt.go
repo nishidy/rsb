@@ -8,23 +8,29 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type Entry struct {
 	file string
 	line int
-	dir  string
 }
 
 type Callee struct {
-	fun string
+	fun  string
+	file string
+	line int
 }
 
 type Trace struct {
+	dir      string
 	entry    Entry
 	callee   Callee
 	level    int
 	maxlevel int
+	result   string
+	nodes    []*Trace
+	wg       *sync.WaitGroup
 }
 
 type Save struct {
@@ -55,28 +61,33 @@ func (t *Trace) recur_visit(path string, info os.FileInfo, err error) error {
 
 func (t *Trace) read_fst_level(path string, lines int, save Save) {
 
-	fmt.Printf("-1- Entry point %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
+	result := fmt.Sprintf("-1- Entry point %s@L%d in \x1b[34m%s\x1b[0m function scope.",
 		t.entry.file, t.entry.line, save.func_name)
 
-	entry := Entry{path, lines, t.entry.dir}
-	callee := Callee{save.func_name}
-	trace := Trace{entry, callee, 2, t.maxlevel}
+	callee := Callee{save.func_name, path, lines}
+	trace := Trace{t.dir, Entry{}, callee, 2, t.maxlevel, result, nil, t.wg}
 
-	filepath.Walk(trace.entry.dir, trace.recur_visit)
+	t.nodes = append(t.nodes, &trace)
+
+	filepath.Walk(trace.dir, trace.recur_visit)
 }
 
 func (t *Trace) read_nth_level(path string, lines int, save Save, is_func bool) {
 
 	if is_func {
 		// Skip if this line defines function
-	} else if t.entry.file == path && t.entry.line == lines {
+	} else if t.callee.file == path && t.callee.line == lines {
 		// Skip if this line appears again
 	} else {
 		h := fmt.Sprintf("%s-%d-", strings.Repeat(" ", t.level-1), t.level)
 
 		if save.func_line < save.struct_line {
-			fmt.Printf("%s %s %s@L%d in \x1b[31m%s\x1b[0m struct scope.\n",
+			result := fmt.Sprintf("%s %s %s@L%d in \x1b[31m%s\x1b[0m struct scope.",
 				h, t.callee.fun, path, lines, save.struct_name)
+
+			callee := Callee{save.func_name, path, lines}
+			trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
+			t.nodes = append(t.nodes, &trace)
 		} else {
 
 			path_slice := strings.Split(path, ".")
@@ -84,23 +95,33 @@ func (t *Trace) read_nth_level(path string, lines int, save Save, is_func bool) 
 
 			if t.level <= t.maxlevel {
 				if ext == "c" {
-					fmt.Printf("%s %s %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
+					result := fmt.Sprintf("%s %s %s@L%d in \x1b[34m%s\x1b[0m function scope.",
 						h, t.callee.fun, path, lines, save.func_name)
 
-					entry := Entry{path, lines, t.entry.dir}
-					callee := Callee{save.func_name}
-					trace := Trace{entry, callee, t.level + 1, t.maxlevel}
+					callee := Callee{save.func_name, path, lines}
+					trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
+					t.nodes = append(t.nodes, &trace)
 
-					filepath.Walk(trace.entry.dir, trace.recur_visit)
+					go t.new_walk(&trace)
 				} else {
-					fmt.Printf("%s %s defined in \x1b[31m%s@L%d\x1b[0m.\n",
+					result := fmt.Sprintf("%s %s defined in \x1b[31m%s@L%d\x1b[0m.",
 						h, t.callee.fun, path, lines)
+
+					callee := Callee{save.func_name, path, lines}
+					trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
+					t.nodes = append(t.nodes, &trace)
 				}
 			}
 
 		}
 	}
 
+}
+
+func (t *Trace) new_walk(trace *Trace) {
+	t.wg.Add(1)
+	filepath.Walk(t.dir, trace.recur_visit)
+	t.wg.Done()
 }
 
 func (t *Trace) read(path string) {
@@ -205,15 +226,24 @@ func main() {
 		os.Exit(-2)
 	}
 
-	entry := Entry{file, line, dir}
-	callee := Callee{""}
-	trace := Trace{entry, callee, 1, maxlevel}
+	ent := fmt.Sprintf("Go search from this entry point %s@L%d.", file, line)
 
-	for {
-		filepath.Walk(trace.entry.dir, trace.recur_visit)
-		//trace.entry.dir = ".."
-		//continue
-		break
+	wg := new(sync.WaitGroup)
+	entry := Entry{file, line}
+	trace := Trace{dir, entry, Callee{}, 1, maxlevel, ent, nil, wg}
+
+	filepath.Walk(trace.dir, trace.recur_visit)
+	trace.wg.Wait()
+
+	down_tree(&trace)
+}
+
+func down_tree(root *Trace) {
+	if root.result == "" {
+	} else {
+		fmt.Println(root.result)
+		for _, node := range root.nodes {
+			down_tree(node)
+		}
 	}
-
 }
