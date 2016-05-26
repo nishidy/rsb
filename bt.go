@@ -68,7 +68,7 @@ func (t *Trace) recur_visit(path string, info os.FileInfo, err error) error {
 	return nil
 }
 
-func get_home() string {
+func get_home_env() string {
 	for _, env := range os.Environ() {
 		if strings.Contains(env, "HOME=") {
 			return strings.Split(env, "=")[1]
@@ -87,7 +87,7 @@ func dir_exists(abs_path string) bool {
 }
 
 func get_abs_hashed_dir(file_path, func_name string) string {
-	home_path := get_home()
+	home_path := get_home_env()
 	hashed_dir := get_hashed_dir(file_path, func_name)
 	abs_hashed_dir := filepath.Join(home_path, BTHOME, hashed_dir)
 	return abs_hashed_dir
