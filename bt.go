@@ -146,8 +146,18 @@ func save_result(trace *Trace, results *string) {
 
 func (t *Trace) read_fst_level(path string, lines int, save Save) {
 
-	result := fmt.Sprintf("-1- Entry point %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
-		t.entry.file, t.entry.line, save.func_name)
+	print_cached_result(path, save.func_name)
+
+	fmt.Print(t.result)
+
+	var result string
+	if save.func_line < save.struct_line {
+		result = fmt.Sprintf("-1- Entry point %s@L%d in \x1b[31m%s\x1b[0m struct scope.\n",
+			t.entry.file, t.entry.line, save.struct_name)
+	} else {
+		result = fmt.Sprintf("-1- Entry point %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
+			t.entry.file, t.entry.line, save.func_name)
+	}
 	fmt.Print(result)
 
 	callee := Callee{save.func_name, path, lines}
@@ -155,9 +165,9 @@ func (t *Trace) read_fst_level(path string, lines int, save Save) {
 
 	t.nodes = append(t.nodes, &trace)
 
-	print_cached_result(path, save.func_name)
-
-	filepath.Walk(trace.dir, trace.recur_visit)
+	if save.struct_line < save.func_line {
+		filepath.Walk(trace.dir, trace.recur_visit)
+	}
 }
 
 func (t *Trace) skip_same_callee(save Save) bool {
@@ -299,7 +309,16 @@ func (t *Trace) read(path string) {
 
 func get_struct_name(ln string) []string {
 	re_struct, _ := regexp.Compile("^\\w+ *\\w+ struct +(\\w+) .*=")
-	return re_struct.FindStringSubmatch(ln)
+	if re_struct.FindString(ln) == "" {
+		re_struct_b, _ := regexp.Compile("^struct +(\\w+) *{")
+		if re_struct_b.FindString(ln) == "" {
+			return nil
+		} else {
+			return re_struct_b.FindStringSubmatch(ln)
+		}
+	} else {
+		return re_struct.FindStringSubmatch(ln)
+	}
 }
 
 func get_func_name(ln string) []string {
@@ -343,7 +362,6 @@ func main() {
 	}
 
 	ent := fmt.Sprintf("Go search from this entry point %s@L%d.\n", file, line)
-	fmt.Print(ent)
 
 	wg := new(sync.WaitGroup)
 	entry := Entry{file, line}
