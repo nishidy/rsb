@@ -132,7 +132,7 @@ func save_result(trace *Trace, results *string) {
 
 	if dir_exists(abs_hashed_dir) {
 		os.RemoveAll(abs_hashed_dir)
-		fmt.Println("# Overwite the cache.")
+		fmt.Println("# Overwrite the cache.")
 	}
 
 	err := os.MkdirAll(abs_hashed_dir, 0755)
@@ -148,6 +148,7 @@ func (t *Trace) read_fst_level(path string, lines int, save Save) {
 
 	result := fmt.Sprintf("-1- Entry point %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
 		t.entry.file, t.entry.line, save.func_name)
+	fmt.Print(result)
 
 	callee := Callee{save.func_name, path, lines}
 	trace := Trace{t.dir, Entry{}, callee, 2, t.maxlevel, result, nil, t.wg}
@@ -159,6 +160,16 @@ func (t *Trace) read_fst_level(path string, lines int, save Save) {
 	filepath.Walk(trace.dir, trace.recur_visit)
 }
 
+func (t *Trace) skip_same_callee(save Save) bool {
+	if len(t.nodes) > 0 {
+		if t.nodes[len(t.nodes)-1].callee.fun == save.func_name ||
+			t.nodes[len(t.nodes)-1].callee.fun == save.struct_name {
+			return true
+		}
+	}
+	return false
+}
+
 func (t *Trace) read_nth_level(path string, lines int, save Save, is_func bool) {
 
 	if is_func {
@@ -167,14 +178,18 @@ func (t *Trace) read_nth_level(path string, lines int, save Save, is_func bool) 
 		// Skip if this line appears again
 	} else if t.maxlevel < t.level {
 		//
+	} else if t.skip_same_callee(save) {
+		// Skip if the same callee is found in a row
 	} else {
+
 		h := fmt.Sprintf("%s-%d-", strings.Repeat(" ", t.level-1), t.level)
 
 		if save.func_line < save.struct_line {
 			result := fmt.Sprintf("%s %s %s@L%d in \x1b[31m%s\x1b[0m struct scope.\n",
 				h, t.callee.fun, path, lines, save.struct_name)
+			fmt.Print(result)
 
-			callee := Callee{save.func_name, path, lines}
+			callee := Callee{save.struct_name, path, lines}
 			trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
 			t.nodes = append(t.nodes, &trace)
 		} else {
@@ -185,6 +200,7 @@ func (t *Trace) read_nth_level(path string, lines int, save Save, is_func bool) 
 			if ext == "c" {
 				result := fmt.Sprintf("%s %s %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
 					h, t.callee.fun, path, lines, save.func_name)
+				fmt.Print(result)
 
 				callee := Callee{save.func_name, path, lines}
 				trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
@@ -195,12 +211,14 @@ func (t *Trace) read_nth_level(path string, lines int, save Save, is_func bool) 
 			} else {
 				result := fmt.Sprintf("%s \x1b[31m%s\x1b[0m defined in %s@L%d.\n",
 					h, t.callee.fun, path, lines)
+				fmt.Print(result)
 
 				callee := Callee{save.func_name, path, lines}
 				trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
 				t.nodes = append(t.nodes, &trace)
 			}
 		}
+
 	}
 
 }
@@ -254,8 +272,9 @@ func (t *Trace) read(path string) {
 			}
 
 			if t.level == 1 {
-				if lines == t.entry.line {
+				if t.entry.line <= lines {
 					t.read_fst_level(path, lines, save)
+					break
 				}
 			} else {
 				if strings.Contains(ln, t.callee.fun) {
@@ -324,6 +343,7 @@ func main() {
 	}
 
 	ent := fmt.Sprintf("Go search from this entry point %s@L%d.\n", file, line)
+	fmt.Print(ent)
 
 	wg := new(sync.WaitGroup)
 	entry := Entry{file, line}
@@ -335,6 +355,5 @@ func main() {
 	results := ""
 	down_tree(&trace, &results)
 	save_result(&trace, &results)
-	fmt.Print(results)
 
 }
