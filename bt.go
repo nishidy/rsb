@@ -2,13 +2,20 @@ package main
 
 import (
 	"bufio"
+	"crypto/md5"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+)
+
+const (
+	BTHOME = ".bt"
 )
 
 type Entry struct {
@@ -42,10 +49,12 @@ type Save struct {
 
 func (t *Trace) recur_visit(path string, info os.FileInfo, err error) error {
 
-	if strings.HasPrefix(path, ".") {
+	file := filepath.Base(path)
+
+	if strings.HasPrefix(file, ".") {
 	} else {
-		path_slice := strings.Split(path, ".")
-		ext := path_slice[len(path_slice)-1]
+		file_slice := strings.Split(file, ".")
+		ext := file_slice[len(file_slice)-1]
 		if ext == "c" || ext == "h" {
 			if t.level == 1 {
 				if t.entry.file == path {
@@ -59,15 +68,93 @@ func (t *Trace) recur_visit(path string, info os.FileInfo, err error) error {
 	return nil
 }
 
+func get_home() string {
+	for _, env := range os.Environ() {
+		if strings.Contains(env, "HOME=") {
+			return strings.Split(env, "=")[1]
+		}
+	}
+	return ""
+}
+
+func get_hashed_dir(file_path, func_name string) string {
+	return fmt.Sprintf("%x", md5.Sum([]byte(file_path+func_name)))
+}
+
+func dir_exists(abs_path string) bool {
+	_, err := os.Stat(abs_path)
+	return err == nil
+}
+
+func get_abs_hashed_dir(file_path, func_name string) string {
+	home_path := get_home()
+	hashed_dir := get_hashed_dir(file_path, func_name)
+	abs_hashed_dir := filepath.Join(home_path, BTHOME, hashed_dir)
+	return abs_hashed_dir
+}
+
+func get_cached_result(file_path, func_name string) (string, error) {
+
+	abs_hashed_dir := get_abs_hashed_dir(file_path, func_name)
+
+	if dir_exists(abs_hashed_dir) {
+		result, err := ioutil.ReadFile(filepath.Join(abs_hashed_dir, "result"))
+		if err != nil {
+			os.Exit(12)
+		}
+		return string(result), nil
+	} else {
+		return "", errors.New("Dir not exists.")
+	}
+
+}
+
+func print_cached_result(path, func_name string) {
+
+	file_path, err := filepath.Abs(path)
+	if err != nil {
+		os.Exit(10)
+	}
+
+	result, err := get_cached_result(file_path, func_name)
+	if err != nil {
+	} else {
+		fmt.Println("# Show cached result.")
+		fmt.Println(result)
+		fmt.Println("# Go on search...")
+	}
+}
+
+func save_result(trace *Trace, results *string) {
+	file_path, _ := filepath.Abs(trace.entry.file)
+	func_name := trace.nodes[0].callee.fun
+	abs_hashed_dir := get_abs_hashed_dir(file_path, func_name)
+
+	if dir_exists(abs_hashed_dir) {
+		os.RemoveAll(abs_hashed_dir)
+		fmt.Println("# Overwite the cache.")
+	}
+
+	err := os.MkdirAll(abs_hashed_dir, 0755)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(21)
+	}
+
+	ioutil.WriteFile(filepath.Join(abs_hashed_dir, "result"), []byte(*results), 0400)
+}
+
 func (t *Trace) read_fst_level(path string, lines int, save Save) {
 
-	result := fmt.Sprintf("-1- Entry point %s@L%d in \x1b[34m%s\x1b[0m function scope.",
+	result := fmt.Sprintf("-1- Entry point %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
 		t.entry.file, t.entry.line, save.func_name)
 
 	callee := Callee{save.func_name, path, lines}
 	trace := Trace{t.dir, Entry{}, callee, 2, t.maxlevel, result, nil, t.wg}
 
 	t.nodes = append(t.nodes, &trace)
+
+	print_cached_result(path, save.func_name)
 
 	filepath.Walk(trace.dir, trace.recur_visit)
 }
@@ -84,7 +171,7 @@ func (t *Trace) read_nth_level(path string, lines int, save Save, is_func bool) 
 		h := fmt.Sprintf("%s-%d-", strings.Repeat(" ", t.level-1), t.level)
 
 		if save.func_line < save.struct_line {
-			result := fmt.Sprintf("%s %s %s@L%d in \x1b[31m%s\x1b[0m struct scope.",
+			result := fmt.Sprintf("%s %s %s@L%d in \x1b[31m%s\x1b[0m struct scope.\n",
 				h, t.callee.fun, path, lines, save.struct_name)
 
 			callee := Callee{save.func_name, path, lines}
@@ -96,7 +183,7 @@ func (t *Trace) read_nth_level(path string, lines int, save Save, is_func bool) 
 			ext := path_slice[len(path_slice)-1]
 
 			if ext == "c" {
-				result := fmt.Sprintf("%s %s %s@L%d in \x1b[34m%s\x1b[0m function scope.",
+				result := fmt.Sprintf("%s %s %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
 					h, t.callee.fun, path, lines, save.func_name)
 
 				callee := Callee{save.func_name, path, lines}
@@ -106,7 +193,7 @@ func (t *Trace) read_nth_level(path string, lines int, save Save, is_func bool) 
 				go t.new_walk(&trace)
 
 			} else {
-				result := fmt.Sprintf("%s \x1b[31m%s\x1b[0m defined in %s@L%d.",
+				result := fmt.Sprintf("%s \x1b[31m%s\x1b[0m defined in %s@L%d.\n",
 					h, t.callee.fun, path, lines)
 
 				callee := Callee{save.func_name, path, lines}
@@ -206,6 +293,16 @@ func get_func_name(ln string) []string {
 	}
 }
 
+func down_tree(root *Trace, results *string) {
+	if root.result == "" {
+	} else {
+		*results += root.result
+		for _, node := range root.nodes {
+			down_tree(node, results)
+		}
+	}
+}
+
 func main() {
 
 	if len(os.Args) != 5 {
@@ -216,17 +313,17 @@ func main() {
 
 	line, err := strconv.Atoi(os.Args[2])
 	if err != nil {
-		os.Exit(-2)
+		os.Exit(-3)
 	}
 
 	dir := os.Args[3]
 
 	maxlevel, err := strconv.Atoi(os.Args[4])
 	if err != nil {
-		os.Exit(-2)
+		os.Exit(-5)
 	}
 
-	ent := fmt.Sprintf("Go search from this entry point %s@L%d.", file, line)
+	ent := fmt.Sprintf("Go search from this entry point %s@L%d.\n", file, line)
 
 	wg := new(sync.WaitGroup)
 	entry := Entry{file, line}
@@ -235,15 +332,9 @@ func main() {
 	filepath.Walk(trace.dir, trace.recur_visit)
 	trace.wg.Wait()
 
-	down_tree(&trace)
-}
+	results := ""
+	down_tree(&trace, &results)
+	save_result(&trace, &results)
+	fmt.Print(results)
 
-func down_tree(root *Trace) {
-	if root.result == "" {
-	} else {
-		fmt.Println(root.result)
-		for _, node := range root.nodes {
-			down_tree(node)
-		}
-	}
 }
