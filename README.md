@@ -7,3 +7,8 @@ This runs depth-first search for functions with goroutines and show the backtrac
 $ bt ENTRYFILE ENTRYLINE ROOTDIR MAXBACKTRACELEVEL
 ```
 
+# Installation
+
+Necessary to install go-clang/bootstrap.
+
+https://github.com/go-clang/bootstrap
