@@ -66,6 +66,8 @@ func (d Decls) Swap(i, j int) {
 func (t *Trace) read_1st_ast(path string) {
 
 	idx := clang.NewIndex(1, 0)
+	defer idx.Dispose()
+
 	tu := idx.ParseTranslationUnit(path, []string{}, nil, 0)
 	cursor := tu.TranslationUnitCursor()
 
@@ -236,6 +238,8 @@ func save_result(trace *Trace, results *string) {
 func (t *Trace) read_nth_ast(path string) {
 
 	idx := clang.NewIndex(1, 0)
+	defer idx.Dispose()
+
 	tu := idx.ParseTranslationUnit(path, []string{}, nil, 0)
 	cursor := tu.TranslationUnitCursor()
 
@@ -298,7 +302,6 @@ func (t *Trace) read_nth_ast(path string) {
 					}
 				}
 			}
-
 		}
 
 		if re_cend.MatchString(ln) {
@@ -306,9 +309,7 @@ func (t *Trace) read_nth_ast(path string) {
 		}
 
 		lines += 1
-
 	}
-
 }
 
 func (t *Trace) go_walk(path string, lines uint32, decls Decls, predecl_line uint32) uint32 {
@@ -371,7 +372,6 @@ func (t *Trace) go_walk(path string, lines uint32, decls Decls, predecl_line uin
 			clang.Cursor_StructDecl:
 			predecl = decl
 		}
-
 	}
 
 	return decl_line
