@@ -9,9 +9,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/go-clang/bootstrap/clang"
 )
 
 const (
@@ -20,13 +23,13 @@ const (
 
 type Entry struct {
 	file string
-	line int
+	line uint32
 }
 
 type Callee struct {
 	fun  string
 	file string
-	line int
+	line uint32
 }
 
 type Trace struct {
@@ -40,11 +43,95 @@ type Trace struct {
 	wg       *sync.WaitGroup
 }
 
-type Save struct {
-	func_name   string
-	func_line   int
-	struct_name string
-	struct_line int
+type Decl struct {
+	line uint32
+	kind clang.CursorKind
+	name string
+}
+
+type Decls []Decl
+
+func (d Decls) Less(i, j int) bool {
+	return d[i].line < d[j].line
+}
+
+func (d Decls) Len() int {
+	return len(d)
+}
+
+func (d Decls) Swap(i, j int) {
+	d[i], d[j] = d[j], d[i]
+}
+
+func (t *Trace) read_1st_ast(path string) {
+
+	idx := clang.NewIndex(1, 0)
+	tu := idx.ParseTranslationUnit(path, []string{}, nil, 0)
+	cursor := tu.TranslationUnitCursor()
+
+	decls := Decls{}
+	cursor.Visit(func(cursor, parent clang.Cursor) clang.ChildVisitResult {
+
+		_, lines, _, _ := cursor.Location().ExpansionLocation()
+
+		switch cursor.Kind() {
+		case clang.Cursor_FunctionDecl:
+			decls = append(decls, Decl{lines, clang.Cursor_FunctionDecl, cursor.Spelling()})
+		case clang.Cursor_StructDecl:
+			decls = append(decls, Decl{lines, clang.Cursor_StructDecl, cursor.Spelling()})
+		}
+
+		switch cursor.Kind() {
+		case clang.Cursor_ClassDecl,
+			clang.Cursor_EnumDecl,
+			clang.Cursor_StructDecl,
+			clang.Cursor_Namespace,
+			clang.Cursor_FunctionDecl,
+			clang.Cursor_CompoundStmt:
+			return clang.ChildVisit_Recurse
+		}
+
+		return clang.ChildVisit_Continue
+	})
+
+	sort.Sort(decls)
+
+	predecl := Decl{}
+	for _, decl := range decls {
+
+		if t.entry.line <= decl.line {
+
+			result := ""
+			switch predecl.kind {
+			case clang.Cursor_FunctionDecl:
+				result = fmt.Sprintf("-1- Entry point %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
+					t.entry.file, t.entry.line, predecl.name)
+
+			case clang.Cursor_StructDecl:
+				result = fmt.Sprintf("-1- Entry point %s@L%d in \x1b[31m%s\x1b[0m struct scope.\n",
+					t.entry.file, t.entry.line, predecl.name)
+
+			}
+
+			print_cached_result(path, predecl.name)
+
+			callee := Callee{predecl.name, path, predecl.line}
+			trace := Trace{t.dir, Entry{}, callee, 2, t.maxlevel, result, nil, t.wg}
+			t.nodes = append(t.nodes, &trace)
+
+			filepath.Walk(trace.dir, trace.recur_visit)
+
+			break
+		}
+
+		switch decl.kind {
+		case clang.Cursor_FunctionDecl,
+			clang.Cursor_StructDecl:
+			predecl = decl
+		}
+
+	}
+
 }
 
 func (t *Trace) recur_visit(path string, info os.FileInfo, err error) error {
@@ -53,15 +140,17 @@ func (t *Trace) recur_visit(path string, info os.FileInfo, err error) error {
 
 	if strings.HasPrefix(file, ".") {
 	} else {
+
 		file_slice := strings.Split(file, ".")
 		ext := file_slice[len(file_slice)-1]
+
 		if ext == "c" || ext == "h" {
 			if t.level == 1 {
 				if t.entry.file == path {
-					t.read(path)
+					t.read_1st_ast(path)
 				}
-			} else {
-				t.read(path)
+			} else if t.level <= t.maxlevel {
+				t.read_nth_ast(path)
 			}
 		}
 	}
@@ -144,155 +233,68 @@ func save_result(trace *Trace, results *string) {
 	ioutil.WriteFile(filepath.Join(abs_hashed_dir, "result"), []byte(*results), 0400)
 }
 
-func (t *Trace) read_fst_level(path string, lines int, save Save) {
+func (t *Trace) read_nth_ast(path string) {
 
-	print_cached_result(path, save.func_name)
+	idx := clang.NewIndex(1, 0)
+	tu := idx.ParseTranslationUnit(path, []string{}, nil, 0)
+	cursor := tu.TranslationUnitCursor()
 
-	fmt.Print(t.result)
+	decls := Decls{}
+	cursor.Visit(func(cursor, parent clang.Cursor) clang.ChildVisitResult {
 
-	var result string
-	if save.func_line < save.struct_line {
-		result = fmt.Sprintf("-1- Entry point %s@L%d in \x1b[31m%s\x1b[0m struct scope.\n",
-			t.entry.file, t.entry.line, save.struct_name)
-	} else {
-		result = fmt.Sprintf("-1- Entry point %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
-			t.entry.file, t.entry.line, save.func_name)
-	}
-	fmt.Print(result)
+		_, lines, _, _ := cursor.Location().ExpansionLocation()
 
-	callee := Callee{save.func_name, path, lines}
-	trace := Trace{t.dir, Entry{}, callee, 2, t.maxlevel, result, nil, t.wg}
-
-	t.nodes = append(t.nodes, &trace)
-
-	if save.struct_line < save.func_line {
-		filepath.Walk(trace.dir, trace.recur_visit)
-	}
-}
-
-func (t *Trace) skip_same_callee(save Save) bool {
-	if len(t.nodes) > 0 {
-		if t.nodes[len(t.nodes)-1].callee.fun == save.func_name ||
-			t.nodes[len(t.nodes)-1].callee.fun == save.struct_name {
-			return true
-		}
-	}
-	return false
-}
-
-func (t *Trace) read_nth_level(path string, lines int, save Save, is_func bool) {
-
-	if is_func {
-		// Skip if this line defines function
-	} else if t.callee.file == path && t.callee.line == lines {
-		// Skip if this line appears again
-	} else if t.maxlevel < t.level {
-		//
-	} else if t.skip_same_callee(save) {
-		// Skip if the same callee is found in a row
-	} else {
-
-		h := fmt.Sprintf("%s-%d-", strings.Repeat(" ", t.level-1), t.level)
-
-		if save.func_line < save.struct_line {
-			result := fmt.Sprintf("%s %s %s@L%d in \x1b[31m%s\x1b[0m struct scope.\n",
-				h, t.callee.fun, path, lines, save.struct_name)
-			fmt.Print(result)
-
-			callee := Callee{save.struct_name, path, lines}
-			trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
-			t.nodes = append(t.nodes, &trace)
-		} else {
-
-			path_slice := strings.Split(path, ".")
-			ext := path_slice[len(path_slice)-1]
-
-			if ext == "c" {
-				result := fmt.Sprintf("%s %s %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
-					h, t.callee.fun, path, lines, save.func_name)
-				fmt.Print(result)
-
-				callee := Callee{save.func_name, path, lines}
-				trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
-				t.nodes = append(t.nodes, &trace)
-
-				go t.new_walk(&trace)
-
-			} else {
-				result := fmt.Sprintf("%s \x1b[31m%s\x1b[0m defined in %s@L%d.\n",
-					h, t.callee.fun, path, lines)
-				fmt.Print(result)
-
-				callee := Callee{save.func_name, path, lines}
-				trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
-				t.nodes = append(t.nodes, &trace)
-			}
+		switch cursor.Kind() {
+		case clang.Cursor_FunctionDecl:
+			decls = append(decls, Decl{lines, clang.Cursor_FunctionDecl, cursor.Spelling()})
+		case clang.Cursor_StructDecl:
+			decls = append(decls, Decl{lines, clang.Cursor_StructDecl, cursor.Spelling()})
+		case clang.Cursor_CallExpr:
+			decls = append(decls, Decl{lines, clang.Cursor_CallExpr, cursor.Spelling()})
 		}
 
-	}
+		switch cursor.Kind() {
+		case clang.Cursor_ClassDecl,
+			clang.Cursor_EnumDecl,
+			clang.Cursor_StructDecl,
+			clang.Cursor_Namespace,
+			clang.Cursor_FunctionDecl,
+			clang.Cursor_CompoundStmt:
+			return clang.ChildVisit_Recurse
+		}
 
-}
+		return clang.ChildVisit_Continue
+	})
 
-func (t *Trace) new_walk(trace *Trace) {
-	t.wg.Add(1)
-	filepath.Walk(t.dir, trace.recur_visit)
-	t.wg.Done()
-}
-
-func (t *Trace) read(path string) {
+	sort.Sort(decls)
 
 	fd, err := os.Open(path)
 	if err != nil {
-		fmt.Printf("%s file not exist.\n", path)
-		os.Exit(1)
+		fmt.Println(err.Error())
+		os.Exit(2)
 	}
+	sc := bufio.NewScanner(fd)
 
-	save := Save{"", 0, "", 0}
-	lines := 1
-
-	re_cstart, _ := regexp.Compile("/\\*")
-	re_cend, _ := regexp.Compile("\\*/")
-	re_callee, _ := regexp.Compile("\\w+")
-
+	var lines uint32 = 1
+	var predecl_line uint32 = 1
 	comment := false
 
-	sc := bufio.NewScanner(fd)
+	re_cstart, _ := regexp.Compile("/\\*")
+	re_cend, _ := regexp.Compile("\\*")
+	re_callee, _ := regexp.Compile("\\w+")
+
 	for sc.Scan() {
 		ln := sc.Text()
-
 		if re_cstart.MatchString(ln) {
 			comment = true
 		}
 
 		if !comment {
 
-			func_name := get_func_name(ln)
-			is_func := false
-			if func_name != nil {
-				save.func_name = func_name[1]
-				save.func_line = lines
-				is_func = true
-				//fmt.Printf("Now the scoped is changed to %s\n",save.func_name)
-			}
-
-			struct_name := get_struct_name(ln)
-			if struct_name != nil {
-				save.struct_name = struct_name[1]
-				save.struct_line = lines
-			}
-
-			if t.level == 1 {
-				if t.entry.line <= lines {
-					t.read_fst_level(path, lines, save)
-					break
-				}
-			} else {
-				if strings.Contains(ln, t.callee.fun) {
-					for _, str := range re_callee.FindAllString(ln, -1) {
-						if str == t.callee.fun {
-							t.read_nth_level(path, lines, save, is_func)
-							break
-						}
+			if strings.Contains(ln, t.callee.fun) {
+				for _, str := range re_callee.FindAllString(ln, -1) {
+					if str == t.callee.fun {
+						predecl_line = t.go_walk(path, lines, decls, predecl_line)
 					}
 				}
 			}
@@ -304,7 +306,82 @@ func (t *Trace) read(path string) {
 		}
 
 		lines += 1
+
 	}
+
+}
+
+func (t *Trace) go_walk(path string, lines uint32, decls Decls, predecl_line uint32) uint32 {
+
+	predecl := Decl{}
+	var decl_line uint32 = 1
+
+	for _, decl := range decls {
+
+		if lines <= decl.line {
+
+			h := fmt.Sprintf("%s-%d-", strings.Repeat(" ", t.level-1), t.level)
+
+			switch predecl.kind {
+			case clang.Cursor_FunctionDecl:
+
+				path_slice := strings.Split(path, ".")
+				ext := path_slice[len(path_slice)-1]
+
+				if ext == "c" {
+					result := fmt.Sprintf("%s %s %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
+						h, t.callee.fun, path, lines, predecl.name)
+					//fmt.Print(result)
+
+					callee := Callee{predecl.name, path, predecl.line}
+					trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
+					t.nodes = append(t.nodes, &trace)
+
+					if decl.line != predecl_line {
+						go t.new_walk(&trace)
+					}
+
+				} else {
+					result := fmt.Sprintf("%s \x1b[31m%s\x1b[0m defined in %s@L%d.\n",
+						h, t.callee.fun, path, predecl.line)
+					//fmt.Print(result)
+
+					callee := Callee{predecl.name, path, predecl.line}
+					trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
+					t.nodes = append(t.nodes, &trace)
+				}
+
+			case clang.Cursor_StructDecl:
+				result := fmt.Sprintf("%s %s %s@L%d in \x1b[31m%s\x1b[0m struct scope.\n",
+					h, t.callee.fun, path, lines, predecl.name)
+				//fmt.Print(result)
+
+				callee := Callee{predecl.name, path, predecl.line}
+				trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
+				t.nodes = append(t.nodes, &trace)
+			}
+
+			decl_line = decl.line
+			break
+
+		}
+
+		switch decl.kind {
+		case clang.Cursor_FunctionDecl,
+			clang.Cursor_StructDecl:
+			predecl = decl
+		}
+
+	}
+
+	return decl_line
+
+}
+
+func (t *Trace) new_walk(trace *Trace) {
+	t.wg.Add(1)
+	filepath.Walk(t.dir, trace.recur_visit)
+	t.wg.Done()
 }
 
 func get_struct_name(ln string) []string {
@@ -349,7 +426,7 @@ func main() {
 
 	file := os.Args[1]
 
-	line, err := strconv.Atoi(os.Args[2])
+	line, err := strconv.ParseUint(os.Args[2], 10, 32)
 	if err != nil {
 		os.Exit(-3)
 	}
@@ -364,7 +441,7 @@ func main() {
 	ent := fmt.Sprintf("Go search from this entry point %s@L%d.\n", file, line)
 
 	wg := new(sync.WaitGroup)
-	entry := Entry{file, line}
+	entry := Entry{file, uint32(line)}
 	trace := Trace{dir, entry, Callee{}, 1, maxlevel, ent, nil, wg}
 
 	filepath.Walk(trace.dir, trace.recur_visit)
@@ -372,6 +449,7 @@ func main() {
 
 	results := ""
 	down_tree(&trace, &results)
+	fmt.Println(results)
 	save_result(&trace, &results)
 
 }
