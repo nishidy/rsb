@@ -253,8 +253,6 @@ func (t *Trace) read_nth_ast(path string) {
 			decls = append(decls, Decl{lines, clang.Cursor_FunctionDecl, cursor.Spelling()})
 		case clang.Cursor_StructDecl:
 			decls = append(decls, Decl{lines, clang.Cursor_StructDecl, cursor.Spelling()})
-		case clang.Cursor_CallExpr:
-			decls = append(decls, Decl{lines, clang.Cursor_CallExpr, cursor.Spelling()})
 		}
 
 		switch cursor.Kind() {
@@ -294,7 +292,6 @@ func (t *Trace) read_nth_ast(path string) {
 		}
 
 		if !comment {
-
 			if strings.Contains(ln, t.callee.fun) {
 				for _, str := range re_callee.FindAllString(ln, -1) {
 					if str == t.callee.fun {
@@ -332,7 +329,6 @@ func (t *Trace) go_walk(path string, lines uint32, decls Decls, predecl_line uin
 				if ext == "c" {
 					result := fmt.Sprintf("%s %s %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
 						h, t.callee.fun, path, lines, predecl.name)
-					//fmt.Print(result)
 
 					callee := Callee{predecl.name, path, predecl.line}
 					trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
@@ -345,7 +341,6 @@ func (t *Trace) go_walk(path string, lines uint32, decls Decls, predecl_line uin
 				} else {
 					result := fmt.Sprintf("%s \x1b[31m%s\x1b[0m defined in %s@L%d.\n",
 						h, t.callee.fun, path, predecl.line)
-					//fmt.Print(result)
 
 					callee := Callee{predecl.name, path, predecl.line}
 					trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
@@ -355,7 +350,6 @@ func (t *Trace) go_walk(path string, lines uint32, decls Decls, predecl_line uin
 			case clang.Cursor_StructDecl:
 				result := fmt.Sprintf("%s %s %s@L%d in \x1b[31m%s\x1b[0m struct scope.\n",
 					h, t.callee.fun, path, lines, predecl.name)
-				//fmt.Print(result)
 
 				callee := Callee{predecl.name, path, predecl.line}
 				trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
