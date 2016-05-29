@@ -316,7 +316,7 @@ func (t *Trace) go_walk(path string, lines uint32, decls Decls, predecl_line uin
 
 	for _, decl := range decls {
 
-		if lines <= decl.line {
+		if lines < decl.line {
 
 			h := fmt.Sprintf("%s-%d-", strings.Repeat(" ", t.level-1), t.level)
 
