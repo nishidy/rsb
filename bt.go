@@ -40,6 +40,8 @@ type Trace struct {
 	result   string
 	nodes    []*Trace
 	wg       *sync.WaitGroup
+	mtx      *sync.Mutex
+	decls_db *map[string]Decls
 }
 
 type Decl struct {
@@ -75,6 +77,7 @@ func (t *Trace) make_decls(path string) Decls {
 func (t *Trace) read_1st_func(path string) {
 
 	decls := t.make_decls(path)
+	(*t.decls_db)[path] = decls
 
 	for _, decl := range decls {
 
@@ -95,7 +98,7 @@ func (t *Trace) read_1st_func(path string) {
 			print_cached_result(path, decl.name)
 
 			callee := Callee{decl.name, path, decl.line}
-			trace := Trace{t.dir, Entry{}, callee, 2, t.maxlevel, result, nil, t.wg}
+			trace := Trace{t.dir, Entry{}, callee, 2, t.maxlevel, result, nil, t.wg, t.mtx, t.decls_db}
 			t.nodes = append(t.nodes, &trace)
 
 			filepath.Walk(trace.dir, trace.recur_visit)
@@ -208,9 +211,18 @@ func save_result(trace *Trace, results *string) {
 
 func (t *Trace) read_nth_func(path string) {
 
-	decls := t.make_decls(path)
+	var decls Decls
+	if _, ok := (*t.decls_db)[path]; ok {
+		decls = (*t.decls_db)[path]
+	} else {
+		decls = t.make_decls(path)
+		(*t.mtx).Lock()
+		(*t.decls_db)[path] = decls
+		(*t.mtx).Unlock()
+	}
 
 	fd, err := os.Open(path)
+	defer fd.Close()
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(2)
@@ -294,7 +306,7 @@ func (t *Trace) go_walk(path string, lines uint32, decls Decls, last_decl_line u
 							h, t.callee.fun, path, lines, decl.name)
 
 						callee := Callee{decl.name, path, decl.line}
-						trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
+						trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg, t.mtx, t.decls_db}
 						t.nodes = append(t.nodes, &trace)
 
 						if decl.line != last_decl_line {
@@ -307,7 +319,7 @@ func (t *Trace) go_walk(path string, lines uint32, decls Decls, last_decl_line u
 						h, t.callee.fun, path, decl.line)
 
 					callee := Callee{decl.name, path, decl.line}
-					trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
+					trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg, t.mtx, t.decls_db}
 					t.nodes = append(t.nodes, &trace)
 				}
 
@@ -316,7 +328,7 @@ func (t *Trace) go_walk(path string, lines uint32, decls Decls, last_decl_line u
 					h, t.callee.fun, path, lines, decl.name)
 
 				callee := Callee{decl.name, path, decl.line}
-				trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
+				trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg, t.mtx, t.decls_db}
 				t.nodes = append(t.nodes, &trace)
 			}
 
@@ -383,9 +395,11 @@ func main() {
 
 	ent := fmt.Sprintf("Go search from this entry point %s@L%d.\n", file, line)
 
+	decls_db := make(map[string]Decls)
 	wg := new(sync.WaitGroup)
+	mtx := new(sync.Mutex)
 	entry := Entry{file, uint32(line)}
-	trace := Trace{dir, entry, Callee{}, 1, maxlevel, ent, nil, wg}
+	trace := Trace{dir, entry, Callee{}, 1, maxlevel, ent, nil, wg, mtx, &decls_db}
 
 	filepath.Walk(trace.dir, trace.recur_visit)
 	trace.wg.Wait()
