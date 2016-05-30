@@ -12,8 +12,8 @@ func is_func(ln string) bool {
 	return !strings.ContainsAny(ln, "#;")
 }
 
-func reset(s []string) {
-	s = s[:0]
+func reset(s *[]string) {
+	*s = []string{}
 }
 
 func get_func_name(s []string) string {
@@ -93,7 +93,7 @@ func (t *Trace) get_decls_by_raw(path string) Decls {
 					} else {
 						decls = append(decls, Decl{line, clang.Cursor_FunctionDecl, func_name})
 					}
-					reset(func_decl)
+					reset(&func_decl)
 				}
 			}
 		}
