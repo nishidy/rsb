@@ -36,8 +36,22 @@ func get_func_name(s []string) string {
 	return ""
 }
 
+func exclude_middle_comment(s string) string {
+	l := strings.Index(s, "/*")
+	r := strings.Index(s, "*/") + 2
+
+	if len(s) < r {
+		return s[:l]
+	} else {
+		return s[:l] + s[r:]
+	}
+}
+
 func (t *Trace) get_decls_by_raw(path string) Decls {
+
 	fd, err := os.Open(path)
+	defer fd.Close()
+
 	if err != nil {
 		panic(err.Error())
 	}
@@ -63,17 +77,21 @@ func (t *Trace) get_decls_by_raw(path string) Decls {
 
 		if !comment {
 
-			if ln == "" {
+			real_ln := ""
+			if strings.Contains(ln, "/*") && strings.Contains(ln, "*/") {
+				real_ln = exclude_middle_comment(ln)
+			} else if strings.Contains(ln, "*/") {
+				real_ln = strings.Split(ln, "*/")[1]
+			} else {
+				real_ln = ln
+			}
+
+			if real_ln == "" {
 				continue
 			}
 
-			real_ln := ""
 			if strings.Contains(ln, "//") {
-				real_ln = strings.Split(ln, "//")[0]
-			} else if strings.Contains(ln, "/*") {
-				real_ln = strings.Split(ln, "/*")[0]
-			} else {
-				real_ln = ln
+				real_ln = strings.Split(real_ln, "//")[0]
 			}
 
 			if is_func(real_ln) && scope == 0 {
@@ -88,6 +106,7 @@ func (t *Trace) get_decls_by_raw(path string) Decls {
 				scope -= c
 
 				if scope == 0 && len(func_decl) > 0 {
+
 					if func_name := get_func_name(func_decl); func_name == "" {
 						//fmt.Println("No function name found.")
 					} else {

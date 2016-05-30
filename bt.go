@@ -212,6 +212,7 @@ func save_result(trace *Trace, results *string) {
 func (t *Trace) read_nth_func(path string) {
 
 	var decls Decls
+
 	if _, ok := (*t.decls_db)[path]; ok {
 		decls = (*t.decls_db)[path]
 	} else {
@@ -230,7 +231,7 @@ func (t *Trace) read_nth_func(path string) {
 	sc := bufio.NewScanner(fd)
 
 	scope := 0
-	var lines uint32 = 1
+	var lines uint32 = 0
 	var last_decl_line uint32 = 1
 	comment := false
 
@@ -238,6 +239,7 @@ func (t *Trace) read_nth_func(path string) {
 
 	for sc.Scan() {
 		ln := sc.Text()
+		lines += 1
 
 		if strings.Contains(ln, "/*") {
 			comment = true
@@ -249,17 +251,17 @@ func (t *Trace) read_nth_func(path string) {
 
 		if !comment {
 
-			if ln == "" {
-				continue
-			}
-
 			real_ln := ""
-			if strings.Contains(ln, "//") {
-				real_ln = strings.Split(ln, "//")[0]
-			} else if strings.Contains(ln, "/*") {
-				real_ln = strings.Split(ln, "/*")[0]
+			if strings.Contains(ln, "/*") && strings.Contains(ln, "*/") {
+				real_ln = exclude_middle_comment(ln)
+			} else if strings.Contains(ln, "*/") {
+				real_ln = strings.Split(ln, "*/")[1]
 			} else {
 				real_ln = ln
+			}
+
+			if real_ln == "" {
+				continue
 			}
 
 			if c := strings.Count(real_ln, "{"); c > 0 {
@@ -279,8 +281,6 @@ func (t *Trace) read_nth_func(path string) {
 				}
 			}
 		}
-
-		lines += 1
 	}
 }
 
