@@ -12,12 +12,12 @@ func is_func(ln string) bool {
 	return !strings.ContainsAny(ln, "#;")
 }
 
-func reset(s *string) {
-	*s = ""
+func reset(s []string) {
+	s = s[:0]
 }
 
-func get_func_name(s string) string {
-	func_decl := strings.Split(s, "(")
+func get_func_name(s []string) string {
+	func_decl := strings.Split(strings.Join(s, " "), "(")
 	if len(func_decl) > 1 {
 		tokens := strings.Split(strings.TrimSpace(func_decl[0]), " ")
 		if len(tokens) > 0 {
@@ -47,7 +47,7 @@ func (t *Trace) get_decls_by_raw(path string) Decls {
 	comment := false
 
 	var decls Decls
-	func_decl := ""
+	var func_decl []string
 	sc := bufio.NewScanner(fd)
 	for sc.Scan() {
 		ln := sc.Text()
@@ -77,7 +77,7 @@ func (t *Trace) get_decls_by_raw(path string) Decls {
 			}
 
 			if is_func(real_ln) && scope == 0 {
-				func_decl += real_ln
+				func_decl = append(func_decl, real_ln)
 			}
 
 			if c := strings.Count(real_ln, "{"); c > 0 {
@@ -93,7 +93,7 @@ func (t *Trace) get_decls_by_raw(path string) Decls {
 					} else {
 						decls = append(decls, Decl{line, clang.Cursor_FunctionDecl, func_name})
 					}
-					reset(&func_decl)
+					reset(func_decl)
 				}
 			}
 		}
