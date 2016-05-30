@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,7 +43,7 @@ type Trace struct {
 }
 
 type Decl struct {
-	line uint32
+	line uint32 // Note this indicates the last line of function body
 	kind clang.CursorKind
 	name string
 }
@@ -63,73 +62,45 @@ func (d Decls) Swap(i, j int) {
 	d[i], d[j] = d[j], d[i]
 }
 
+func (t *Trace) make_decls(path string) Decls {
+	var decls Decls
+	if true {
+		decls = t.get_decls_by_raw(path)
+	} else {
+		decls = t.get_decls_by_clang(path)
+	}
+	return decls
+}
+
 func (t *Trace) read_1st_ast(path string) {
 
-	idx := clang.NewIndex(1, 0)
-	defer idx.Dispose()
+	decls := t.make_decls(path)
 
-	tu := idx.ParseTranslationUnit(path, []string{}, nil, 0)
-	cursor := tu.TranslationUnitCursor()
-
-	decls := Decls{}
-	cursor.Visit(func(cursor, parent clang.Cursor) clang.ChildVisitResult {
-
-		_, lines, _, _ := cursor.Location().ExpansionLocation()
-
-		switch cursor.Kind() {
-		case clang.Cursor_FunctionDecl:
-			decls = append(decls, Decl{lines, clang.Cursor_FunctionDecl, cursor.Spelling()})
-		case clang.Cursor_StructDecl:
-			decls = append(decls, Decl{lines, clang.Cursor_StructDecl, cursor.Spelling()})
-		}
-
-		switch cursor.Kind() {
-		case clang.Cursor_ClassDecl,
-			clang.Cursor_EnumDecl,
-			clang.Cursor_StructDecl,
-			clang.Cursor_Namespace,
-			clang.Cursor_FunctionDecl,
-			clang.Cursor_CompoundStmt:
-			return clang.ChildVisit_Recurse
-		}
-
-		return clang.ChildVisit_Continue
-	})
-
-	sort.Sort(decls)
-
-	predecl := Decl{}
 	for _, decl := range decls {
 
 		if t.entry.line <= decl.line {
 
 			result := ""
-			switch predecl.kind {
+			switch decl.kind {
 			case clang.Cursor_FunctionDecl:
 				result = fmt.Sprintf("-1- Entry point %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
-					t.entry.file, t.entry.line, predecl.name)
+					t.entry.file, t.entry.line, decl.name)
 
 			case clang.Cursor_StructDecl:
 				result = fmt.Sprintf("-1- Entry point %s@L%d in \x1b[31m%s\x1b[0m struct scope.\n",
-					t.entry.file, t.entry.line, predecl.name)
+					t.entry.file, t.entry.line, decl.name)
 
 			}
 
-			print_cached_result(path, predecl.name)
+			print_cached_result(path, decl.name)
 
-			callee := Callee{predecl.name, path, predecl.line}
+			callee := Callee{decl.name, path, decl.line}
 			trace := Trace{t.dir, Entry{}, callee, 2, t.maxlevel, result, nil, t.wg}
 			t.nodes = append(t.nodes, &trace)
 
 			filepath.Walk(trace.dir, trace.recur_visit)
 
 			break
-		}
-
-		switch decl.kind {
-		case clang.Cursor_FunctionDecl,
-			clang.Cursor_StructDecl:
-			predecl = decl
 		}
 
 	}
@@ -237,38 +208,7 @@ func save_result(trace *Trace, results *string) {
 
 func (t *Trace) read_nth_ast(path string) {
 
-	idx := clang.NewIndex(1, 0)
-	defer idx.Dispose()
-
-	tu := idx.ParseTranslationUnit(path, []string{}, nil, 0)
-	cursor := tu.TranslationUnitCursor()
-
-	decls := Decls{}
-	cursor.Visit(func(cursor, parent clang.Cursor) clang.ChildVisitResult {
-
-		_, lines, _, _ := cursor.Location().ExpansionLocation()
-
-		switch cursor.Kind() {
-		case clang.Cursor_FunctionDecl:
-			decls = append(decls, Decl{lines, clang.Cursor_FunctionDecl, cursor.Spelling()})
-		case clang.Cursor_StructDecl:
-			decls = append(decls, Decl{lines, clang.Cursor_StructDecl, cursor.Spelling()})
-		}
-
-		switch cursor.Kind() {
-		case clang.Cursor_ClassDecl,
-			clang.Cursor_EnumDecl,
-			clang.Cursor_StructDecl,
-			clang.Cursor_Namespace,
-			clang.Cursor_FunctionDecl,
-			clang.Cursor_CompoundStmt:
-			return clang.ChildVisit_Recurse
-		}
-
-		return clang.ChildVisit_Continue
-	})
-
-	sort.Sort(decls)
+	decls := t.make_decls(path)
 
 	fd, err := os.Open(path)
 	if err != nil {
@@ -278,7 +218,7 @@ func (t *Trace) read_nth_ast(path string) {
 	sc := bufio.NewScanner(fd)
 
 	var lines uint32 = 1
-	var predecl_line uint32 = 1
+	var last_decl_line uint32 = 1
 	comment := false
 
 	re_cstart, _ := regexp.Compile("/\\*")
@@ -295,7 +235,7 @@ func (t *Trace) read_nth_ast(path string) {
 			if strings.Contains(ln, t.callee.fun) {
 				for _, str := range re_callee.FindAllString(ln, -1) {
 					if str == t.callee.fun {
-						predecl_line = t.go_walk(path, lines, decls, predecl_line)
+						last_decl_line = t.go_walk(path, lines, decls, last_decl_line)
 					}
 				}
 			}
@@ -309,49 +249,50 @@ func (t *Trace) read_nth_ast(path string) {
 	}
 }
 
-func (t *Trace) go_walk(path string, lines uint32, decls Decls, predecl_line uint32) uint32 {
+func (t *Trace) go_walk(path string, lines uint32, decls Decls, last_decl_line uint32) uint32 {
 
-	predecl := Decl{}
 	var decl_line uint32 = 1
 
 	for _, decl := range decls {
 
-		if lines < decl.line {
+		if lines <= decl.line {
 
 			h := fmt.Sprintf("%s-%d-", strings.Repeat(" ", t.level-1), t.level)
 
-			switch predecl.kind {
+			switch decl.kind {
 			case clang.Cursor_FunctionDecl:
 
 				path_slice := strings.Split(path, ".")
 				ext := path_slice[len(path_slice)-1]
 
 				if ext == "c" {
-					result := fmt.Sprintf("%s %s %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
-						h, t.callee.fun, path, lines, predecl.name)
+					if t.callee.fun != decl.name {
+						result := fmt.Sprintf("%s %s %s@L%d in \x1b[34m%s\x1b[0m function scope.\n",
+							h, t.callee.fun, path, lines, decl.name)
 
-					callee := Callee{predecl.name, path, predecl.line}
-					trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
-					t.nodes = append(t.nodes, &trace)
+						callee := Callee{decl.name, path, decl.line}
+						trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
+						t.nodes = append(t.nodes, &trace)
 
-					if decl.line != predecl_line {
-						go t.new_walk(&trace)
+						if decl.line != last_decl_line {
+							go t.new_walk(&trace)
+						}
 					}
 
 				} else {
 					result := fmt.Sprintf("%s \x1b[31m%s\x1b[0m defined in %s@L%d.\n",
-						h, t.callee.fun, path, predecl.line)
+						h, t.callee.fun, path, decl.line)
 
-					callee := Callee{predecl.name, path, predecl.line}
+					callee := Callee{decl.name, path, decl.line}
 					trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
 					t.nodes = append(t.nodes, &trace)
 				}
 
 			case clang.Cursor_StructDecl:
 				result := fmt.Sprintf("%s %s %s@L%d in \x1b[31m%s\x1b[0m struct scope.\n",
-					h, t.callee.fun, path, lines, predecl.name)
+					h, t.callee.fun, path, lines, decl.name)
 
-				callee := Callee{predecl.name, path, predecl.line}
+				callee := Callee{decl.name, path, decl.line}
 				trace := Trace{t.dir, Entry{}, callee, t.level + 1, t.maxlevel, result, nil, t.wg}
 				t.nodes = append(t.nodes, &trace)
 			}
@@ -361,11 +302,6 @@ func (t *Trace) go_walk(path string, lines uint32, decls Decls, predecl_line uin
 
 		}
 
-		switch decl.kind {
-		case clang.Cursor_FunctionDecl,
-			clang.Cursor_StructDecl:
-			predecl = decl
-		}
 	}
 
 	return decl_line
@@ -389,16 +325,6 @@ func get_struct_name(ln string) []string {
 		}
 	} else {
 		return re_struct.FindStringSubmatch(ln)
-	}
-}
-
-func get_func_name(ln string) []string {
-	re_not_func, _ := regexp.Compile("[%!\\?\\+\\-]|//")
-	if re_not_func.FindString(ln) == "" {
-		re_func, _ := regexp.Compile("^\\w+ *\\w+ (\\w+) *\\([^\\(\\)]+\\)? *{? *[^;]?$")
-		return re_func.FindStringSubmatch(ln)
-	} else {
-		return nil
 	}
 }
 
