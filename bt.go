@@ -72,7 +72,7 @@ func (t *Trace) make_decls(path string) Decls {
 	return decls
 }
 
-func (t *Trace) read_1st_ast(path string) {
+func (t *Trace) read_1st_func(path string) {
 
 	decls := t.make_decls(path)
 
@@ -120,10 +120,10 @@ func (t *Trace) recur_visit(path string, info os.FileInfo, err error) error {
 		if ext == "c" || ext == "h" {
 			if t.level == 1 {
 				if t.entry.file == path {
-					t.read_1st_ast(path)
+					t.read_1st_func(path)
 				}
 			} else if t.level <= t.maxlevel {
-				t.read_nth_ast(path)
+				t.read_nth_func(path)
 			}
 		}
 	}
@@ -206,7 +206,7 @@ func save_result(trace *Trace, results *string) {
 	ioutil.WriteFile(filepath.Join(abs_hashed_dir, "result"), []byte(*results), 0400)
 }
 
-func (t *Trace) read_nth_ast(path string) {
+func (t *Trace) read_nth_func(path string) {
 
 	decls := t.make_decls(path)
 
