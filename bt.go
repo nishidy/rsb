@@ -190,7 +190,7 @@ func print_cached_result(path, func_name string) {
 	}
 }
 
-func save_result(trace *Trace, results *string) {
+func save_result(trace *Trace, results *[]string) {
 	file_path, _ := filepath.Abs(trace.entry.file)
 	func_name := trace.nodes[0].callee.fun
 	abs_hashed_dir := get_abs_hashed_dir(file_path, func_name)
@@ -206,7 +206,8 @@ func save_result(trace *Trace, results *string) {
 		os.Exit(21)
 	}
 
-	ioutil.WriteFile(filepath.Join(abs_hashed_dir, "result"), []byte(*results), 0400)
+	result := strings.Join(*results, "")
+	ioutil.WriteFile(filepath.Join(abs_hashed_dir, "result"), []byte(result), 0400)
 }
 
 func (t *Trace) read_nth_func(path string) {
@@ -363,10 +364,10 @@ func get_struct_name(ln string) []string {
 	}
 }
 
-func down_tree(root *Trace, results *string) {
+func down_tree(root *Trace, results *[]string) {
 	if root.result == "" {
 	} else {
-		*results += root.result
+		*results = append(*results, root.result)
 		for _, node := range root.nodes {
 			down_tree(node, results)
 		}
@@ -404,9 +405,11 @@ func main() {
 	filepath.Walk(trace.dir, trace.recur_visit)
 	trace.wg.Wait()
 
-	results := ""
+	results := []string{}
 	down_tree(&trace, &results)
-	fmt.Println(results)
-	save_result(&trace, &results)
 
+	term := Term{0, results[1:]}
+	term.Run()
+
+	save_result(&trace, &results)
 }
