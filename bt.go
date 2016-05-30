@@ -217,32 +217,54 @@ func (t *Trace) read_nth_ast(path string) {
 	}
 	sc := bufio.NewScanner(fd)
 
+	scope := 0
 	var lines uint32 = 1
 	var last_decl_line uint32 = 1
 	comment := false
 
-	re_cstart, _ := regexp.Compile("/\\*")
-	re_cend, _ := regexp.Compile("\\*")
 	re_callee, _ := regexp.Compile("\\w+")
 
 	for sc.Scan() {
 		ln := sc.Text()
-		if re_cstart.MatchString(ln) {
+
+		if strings.Contains(ln, "/*") {
 			comment = true
 		}
 
+		if strings.Contains(ln, "*/") {
+			comment = false
+		}
+
 		if !comment {
-			if strings.Contains(ln, t.callee.fun) {
-				for _, str := range re_callee.FindAllString(ln, -1) {
+
+			if ln == "" {
+				continue
+			}
+
+			real_ln := ""
+			if strings.Contains(ln, "//") {
+				real_ln = strings.Split(ln, "//")[0]
+			} else if strings.Contains(ln, "/*") {
+				real_ln = strings.Split(ln, "/*")[0]
+			} else {
+				real_ln = ln
+			}
+
+			if c := strings.Count(real_ln, "{"); c > 0 {
+				scope += c
+			}
+
+			if c := strings.Count(real_ln, "}"); c > 0 {
+				scope -= c
+			}
+
+			if scope > 0 && strings.Contains(real_ln, t.callee.fun) {
+				for _, str := range re_callee.FindAllString(real_ln, -1) {
 					if str == t.callee.fun {
 						last_decl_line = t.go_walk(path, lines, decls, last_decl_line)
 					}
 				}
 			}
-		}
-
-		if re_cend.MatchString(ln) {
-			comment = false
 		}
 
 		lines += 1
