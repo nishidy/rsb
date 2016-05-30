@@ -262,6 +262,7 @@ func (t *Trace) read_nth_func(path string) {
 				for _, str := range re_callee.FindAllString(real_ln, -1) {
 					if str == t.callee.fun {
 						last_decl_line = t.go_walk(path, lines, decls, last_decl_line)
+						break
 					}
 				}
 			}
