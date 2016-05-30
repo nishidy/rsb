@@ -18,7 +18,7 @@ func reset(s *string) {
 
 func get_func_name(s string) string {
 	func_decl := strings.Split(s, "(")
-	if len(func_decl) > 0 {
+	if len(func_decl) > 1 {
 		tokens := strings.Split(strings.TrimSpace(func_decl[0]), " ")
 		if len(tokens) > 0 {
 			func_name := tokens[len(tokens)-1]
