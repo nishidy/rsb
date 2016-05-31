@@ -426,13 +426,16 @@ func main() {
 
 		if arg == "--raw" {
 			raw = true
+			continue
 		}
 		if arg == "--cache" {
 			cache = true
+			continue
 		}
 		if arg == "--vim" {
 			vim = true
 			raw = true
+			continue
 		}
 
 		switch i {
