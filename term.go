@@ -37,7 +37,13 @@ func (t *Term) exec() {
 	item := t.strs[t.ypos]
 	file, line := get_func_line(item)
 	if file != "" && line != "" {
-		cmd := exec.Command("/usr/local/bin/vim", file, "+"+line)
+		vim_path := ""
+		if _, err := os.Stat("/usr/bin/vim"); err == nil {
+			vim_path = "/usr/bin/vim"
+		} else if _, err := os.Stat("/usr/local/bin/vim"); err == nil {
+			vim_path = "/usr/local/bin/vim"
+		}
+		cmd := exec.Command(vim_path, file, "+"+line)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Run()
