@@ -20,6 +20,8 @@ const (
 	BTHOME = ".bt"
 )
 
+var cache bool
+
 type Entry struct {
 	file string
 	line uint32
@@ -95,7 +97,9 @@ func (t *Trace) read_1st_func(path string) {
 
 			}
 
-			print_cached_result(path, decl.name)
+			if cache {
+				print_cached_result(path, decl.name)
+			}
 
 			callee := Callee{decl.name, path, decl.line}
 			trace := Trace{t.dir, Entry{}, callee, 2, t.maxlevel, result, nil, t.wg, t.mtx, t.decls_db}
@@ -383,22 +387,49 @@ func show_result(results []string) {
 
 func main() {
 
-	if len(os.Args) != 5 {
+	if len(os.Args) < 5 {
 		os.Exit(-1)
 	}
 
-	file := os.Args[1]
+	// Mandatory arguments
+	var file string
+	var line uint64
+	var dir string
+	var maxlevel int
 
-	line, err := strconv.ParseUint(os.Args[2], 10, 32)
-	if err != nil {
-		os.Exit(-3)
-	}
+	// Option arguments with double dash
+	raw := false
+	cache = false // global variable
 
-	dir := os.Args[3]
+	i := 0
+	var err error
 
-	maxlevel, err := strconv.Atoi(os.Args[4])
-	if err != nil {
-		os.Exit(-5)
+	for _, arg := range os.Args[1:] {
+
+		if arg == "--raw" {
+			raw = true
+		}
+		if arg == "--cache" {
+			cache = true
+		}
+
+		switch i {
+		case 0:
+			file = arg
+		case 1:
+			line, err = strconv.ParseUint(os.Args[2], 10, 32)
+			if err != nil {
+				os.Exit(-3)
+			}
+		case 2:
+			dir = os.Args[3]
+		case 3:
+			maxlevel, err = strconv.Atoi(os.Args[4])
+			if err != nil {
+				os.Exit(-5)
+			}
+		}
+		i += 1
 	}
 
 	ent := fmt.Sprintf("Go search from this entry point %s@L%d.\n", file, line)
@@ -415,9 +446,15 @@ func main() {
 	results := []string{}
 	down_tree(&trace, &results)
 
-	term := NewTerm(results)
-	term.Run()
+	if !raw {
+		term := NewTerm(results)
+		term.Run()
+	}
 
-	show_result(results)
-	save_result(&trace, &results)
+	// Not important to show the first one
+	show_result(results[1:])
+
+	if cache {
+		save_result(&trace, &results)
+	}
 }
