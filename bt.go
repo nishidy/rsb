@@ -20,7 +20,10 @@ const (
 	BTHOME = ".bt"
 )
 
-var cache bool
+var (
+	cache bool
+	vim   bool
+)
 
 type Entry struct {
 	file string
@@ -378,9 +381,23 @@ func down_tree(root *Trace, results *[]string) {
 	}
 }
 
+func remove_ansi_code(str string) string {
+	str_raw := str
+	str_raw = strings.Replace(str_raw, "\x1b[34m", "", -1)
+	str_raw = strings.Replace(str_raw, "\x1b[31m", "", -1)
+	str_raw = strings.Replace(str_raw, "\x1b[0m", "", -1)
+	return str_raw
+}
+
 func show_result(results []string) {
 	for _, str := range results {
-		fmt.Print(str)
+		real_str := ""
+		if vim {
+			real_str = remove_ansi_code(str)
+		} else {
+			real_str = str
+		}
+		fmt.Print(real_str)
 	}
 	fmt.Println()
 }
@@ -400,6 +417,7 @@ func main() {
 	// Option arguments with double dash
 	raw := false
 	cache = false // global variable
+	vim = false   // global variable
 
 	i := 0
 	var err error
@@ -411,6 +429,10 @@ func main() {
 		}
 		if arg == "--cache" {
 			cache = true
+		}
+		if arg == "--vim" {
+			vim = true
+			raw = true
 		}
 
 		switch i {

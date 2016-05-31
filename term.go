@@ -44,7 +44,7 @@ func (t *Term) exec() {
 	}
 }
 
-func remove_ansi_code(str string) string {
+func replace_ansi_code(str string) string {
 	str_raw := str
 	str_raw = strings.Replace(str_raw, "\x1b[34m", "|", -1)
 	str_raw = strings.Replace(str_raw, "\x1b[31m", "~", -1)
@@ -62,7 +62,7 @@ func (t *Term) draw() {
 		}
 
 		color := termbox.ColorDefault
-		str_raw := remove_ansi_code(str)
+		str_raw := replace_ansi_code(str)
 		i := 0
 		for _, r := range str_raw {
 			if r == '|' {
