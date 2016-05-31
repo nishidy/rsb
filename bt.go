@@ -374,6 +374,13 @@ func down_tree(root *Trace, results *[]string) {
 	}
 }
 
+func show_result(results []string) {
+	for _, str := range results {
+		fmt.Print(str)
+	}
+	fmt.Println()
+}
+
 func main() {
 
 	if len(os.Args) != 5 {
@@ -408,8 +415,9 @@ func main() {
 	results := []string{}
 	down_tree(&trace, &results)
 
-	term := Term{0, results[1:]}
+	term := NewTerm(results)
 	term.Run()
 
+	show_result(results)
 	save_result(&trace, &results)
 }
