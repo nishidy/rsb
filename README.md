@@ -1,7 +1,8 @@
 # Purpose
 
-This is to run a brief static backtrace for C code.
+This is to run a Recursive Static Backtrace for C code.
 This runs depth-first search for functions with goroutines and show the backtrace tree after completing the tree.
+Supported for the use in vim command.
 
 ```
 $ bt ENTRYFILE ENTRYLINE ROOTDIR MAXBACKTRACELEVEL
