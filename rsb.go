@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	BTHOME = ".bt"
+	BTHOME = ".rsb"
 )
 
 var (
