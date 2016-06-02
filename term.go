@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/nsf/termbox-go"
 	"os"
 	"os/exec"
@@ -14,7 +13,8 @@ type Term struct {
 }
 
 func NewTerm(results []string) Term {
-	term := Term{0, []string{}}
+	term := Term{1, []string{}}
+	term.strs = append(term.strs, "# Available keys: vim[enter] up[↓(C-j)] down[↑(C-k)] quit[Esc(C-q)]")
 	for _, result := range results[1:] {
 		term.strs = append(term.strs, result)
 	}
@@ -93,13 +93,14 @@ func (t *Term) draw() {
 
 func (t *Term) Run() {
 
-	fmt.Println("# Finished search. You can open with vim to hit enter on next page.")
-	fmt.Println("# Other available keys: ↓(C-j) ↑(C-k) Esc(C-q)")
-	a := 0
-	fmt.Scanln(&a)
+	/*
+		fmt.Println("# Finished search. You can open with vim to hit enter on next page.")
+		fmt.Println("# Other available keys: ↓(C-j) ↑(C-k) Esc(C-q)")
+		a := 0
+		fmt.Scanln(&a)
+	*/
 
 	_ = termbox.Init()
-	defer termbox.Close()
 
 	t.draw()
 	for {
@@ -108,6 +109,7 @@ func (t *Term) Run() {
 			switch ev.Key {
 			case termbox.KeyEsc,
 				termbox.KeyCtrlQ:
+				termbox.Close()
 				return
 			case termbox.KeyArrowDown,
 				termbox.KeyCtrlJ:
@@ -117,12 +119,14 @@ func (t *Term) Run() {
 				t.draw()
 			case termbox.KeyArrowUp,
 				termbox.KeyCtrlK:
-				if t.ypos > 0 {
+				if t.ypos > 1 {
 					t.ypos -= 1
 				}
 				t.draw()
 			case termbox.KeyEnter:
 				t.exec()
+				termbox.Close()
+				t.Run()
 				return
 			}
 		default:
