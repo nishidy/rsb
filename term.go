@@ -15,8 +15,7 @@ type Term struct {
 }
 
 func NewTerm(results []string) Term {
-	term := Term{1, 0, []string{}}
-	term.strs = append(term.strs, "# Available keys: vim[enter] up[↓(C-j)] down[↑(C-k)] quit[Esc(C-q)]")
+	term := Term{0, 0, []string{}}
 	for _, result := range results[1:] {
 		term.strs = append(term.strs, result)
 	}
@@ -61,8 +60,40 @@ func replace_ansi_code(str string) string {
 	return str_raw
 }
 
+func draw_title(str_raw string, bgcolor termbox.Attribute, y int) {
+	color := termbox.ColorDefault
+	x := 0
+	for _, r := range str_raw {
+		termbox.SetCell(x, y, r, color, bgcolor)
+		x += 1
+	}
+}
+func draw_line(str_raw string, bgcolor termbox.Attribute, y int) {
+	color := termbox.ColorDefault
+	x := 0
+	for _, r := range str_raw {
+		if r == '|' {
+			color = termbox.ColorBlue
+			continue
+		}
+		if r == '~' {
+			color = termbox.ColorRed
+			continue
+		}
+		if r == '^' {
+			color = termbox.ColorDefault
+			continue
+		}
+		termbox.SetCell(x, y+1, r, color, bgcolor)
+		x += 1
+	}
+}
+
 func (t *Term) draw() {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+
+	exp := "# Available keys: vim[enter] up[↓/C-j] down[↑/C-k] head[C-h] bottom[C-b] quit[Esc/C-q]"
+	draw_title(exp, termbox.ColorDefault, 0)
 
 	for y, str := range t.strs[t.ybase:] {
 		bgcolor := termbox.ColorDefault
@@ -71,25 +102,8 @@ func (t *Term) draw() {
 			bgcolor = termbox.ColorWhite
 		}
 
-		color := termbox.ColorDefault
 		str_raw := replace_ansi_code(str)
-		i := 0
-		for _, r := range str_raw {
-			if r == '|' {
-				color = termbox.ColorBlue
-				continue
-			}
-			if r == '~' {
-				color = termbox.ColorRed
-				continue
-			}
-			if r == '^' {
-				color = termbox.ColorDefault
-				continue
-			}
-			termbox.SetCell(i, y, r, color, bgcolor)
-			i += 1
-		}
+		draw_line(str_raw, bgcolor, y)
 	}
 
 	termbox.Flush()
@@ -113,12 +127,13 @@ func (t *Term) Run() {
 				if t.yabs < len(t.strs)-1 {
 					t.yabs += 1
 					_, height := termbox.Size()
-					height -= 1
+					// 1 : index which starts from 0
+					// 2 : the first line is title
+					height -= 2
 					if height < t.yabs-t.ybase {
 						t.ybase += 1
 					}
 				}
-				t.draw()
 			case termbox.KeyArrowUp,
 				termbox.KeyCtrlK:
 				if t.yabs > 0 {
@@ -127,17 +142,22 @@ func (t *Term) Run() {
 						t.ybase = t.yabs
 					}
 				}
-				t.draw()
+			case termbox.KeyCtrlH:
+				t.yabs = 0
+				t.ybase = 0
+			case termbox.KeyCtrlB:
+				_, height := termbox.Size()
+				height -= 2
+				t.yabs = len(t.strs) - 1
+				t.ybase = len(t.strs) - height
 			case termbox.KeyEnter:
-				if t.yabs > 0 {
-					t.exec()
-					termbox.Close()
-					t.Run()
-					return
-				}
+				t.exec()
+				termbox.Close()
+				t.Run()
+				return
 			}
 		default:
-			t.draw()
 		}
+		t.draw()
 	}
 }
