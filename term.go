@@ -1,23 +1,26 @@
 package main
 
 import (
-	"github.com/nsf/termbox-go"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/nsf/termbox-go"
 )
 
 type Term struct {
-	ypos int
-	strs []string
+	yabs  int
+	ybase int
+	strs  []string
 }
 
 func NewTerm(results []string) Term {
-	term := Term{1, []string{}}
+	term := Term{1, 0, []string{}}
 	term.strs = append(term.strs, "# Available keys: vim[enter] up[↓(C-j)] down[↑(C-k)] quit[Esc(C-q)]")
 	for _, result := range results[1:] {
 		term.strs = append(term.strs, result)
 	}
+
 	return term
 }
 
@@ -34,7 +37,7 @@ func get_func_line(s string) (string, string) {
 }
 
 func (t *Term) exec() {
-	item := t.strs[t.ypos]
+	item := t.strs[t.yabs]
 	file, line := get_func_line(item)
 	if file != "" && line != "" {
 		vim_path := ""
@@ -61,9 +64,10 @@ func replace_ansi_code(str string) string {
 func (t *Term) draw() {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 
-	for y, str := range t.strs {
+	for y, str := range t.strs[t.ybase:] {
 		bgcolor := termbox.ColorDefault
-		if y == t.ypos {
+
+		if y == t.yabs-t.ybase {
 			bgcolor = termbox.ColorWhite
 		}
 
@@ -93,13 +97,6 @@ func (t *Term) draw() {
 
 func (t *Term) Run() {
 
-	/*
-		fmt.Println("# Finished search. You can open with vim to hit enter on next page.")
-		fmt.Println("# Other available keys: ↓(C-j) ↑(C-k) Esc(C-q)")
-		a := 0
-		fmt.Scanln(&a)
-	*/
-
 	_ = termbox.Init()
 
 	t.draw()
@@ -113,21 +110,31 @@ func (t *Term) Run() {
 				return
 			case termbox.KeyArrowDown,
 				termbox.KeyCtrlJ:
-				if t.ypos < len(t.strs)-1 {
-					t.ypos += 1
+				if t.yabs < len(t.strs)-1 {
+					t.yabs += 1
+					_, height := termbox.Size()
+					height -= 1
+					if height < t.yabs-t.ybase {
+						t.ybase += 1
+					}
 				}
 				t.draw()
 			case termbox.KeyArrowUp,
 				termbox.KeyCtrlK:
-				if t.ypos > 1 {
-					t.ypos -= 1
+				if t.yabs > 0 {
+					t.yabs -= 1
+					if t.yabs < t.ybase {
+						t.ybase = t.yabs
+					}
 				}
 				t.draw()
 			case termbox.KeyEnter:
-				t.exec()
-				termbox.Close()
-				t.Run()
-				return
+				if t.yabs > 0 {
+					t.exec()
+					termbox.Close()
+					t.Run()
+					return
+				}
 			}
 		default:
 			t.draw()

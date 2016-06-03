@@ -391,7 +391,7 @@ func remove_ansi_code(str string) string {
 
 func show_result(results []string) {
 	for _, str := range results {
-		real_str := ""
+		real_str := "!"
 		if vim {
 			real_str = remove_ansi_code(str)
 		} else {
