@@ -155,8 +155,8 @@ func (t *Term) Run() {
 				termbox.Close()
 				t.Run()
 				return
+			default:
 			}
-		default:
 		}
 		t.draw()
 	}
