@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-func is_func(ln string) bool {
-	return !strings.ContainsAny(ln, "#;")
+func is_not_func(ln string) bool {
+	return strings.ContainsAny(ln, "#;")
 }
 
 func reset(s *[]string) {
@@ -94,8 +94,12 @@ func (t *Trace) get_decls_by_raw(path string) Decls {
 				continue
 			}
 
-			if is_func(real_ln) && scope == 0 {
-				func_decl = append(func_decl, real_ln)
+			if scope == 0 {
+				if is_not_func(real_ln) {
+					reset(&func_decl)
+				} else {
+					func_decl = append(func_decl, real_ln)
+				}
 			}
 
 			if c := strings.Count(real_ln, "{"); c > 0 {
