@@ -86,12 +86,12 @@ func (t *Trace) get_decls_by_raw(path string) Decls {
 				real_ln = ln
 			}
 
-			if real_ln == "" {
-				continue
-			}
-
 			if strings.Contains(ln, "//") {
 				real_ln = strings.Split(real_ln, "//")[0]
+			}
+
+			if real_ln == "" {
+				continue
 			}
 
 			if is_func(real_ln) && scope == 0 {
