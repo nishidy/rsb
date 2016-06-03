@@ -149,7 +149,7 @@ func (t *Term) Run() {
 				_, height := termbox.Size()
 				height -= 2
 				t.yabs = len(t.strs) - 1
-				t.ybase = len(t.strs) - height
+				t.ybase = len(t.strs) - 1 - height
 			case termbox.KeyEnter:
 				t.exec()
 				termbox.Close()
