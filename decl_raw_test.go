@@ -40,7 +40,8 @@ static struct ccchar *baz ( char *i, struct *tree ) {
 			XXX: { is not } but {
 			/* //
 		"test code" */
-		while() { /* */ }
+		while() { /*
+		*/ }
 		return *x;
 	} else {
 		return "x";
