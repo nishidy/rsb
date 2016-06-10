@@ -36,15 +36,72 @@ func get_func_name(s []string) string {
 	return ""
 }
 
-func exclude_middle_comment(s string) string {
-	l := strings.Index(s, "/*")
-	r := strings.Index(s, "*/") + 2
-
-	if len(s) < r {
-		return s[:l]
-	} else {
-		return s[:l] + s[r:]
+func exclude(s string) string {
+	if strings.Contains(s, "\\\"") {
+		s = strings.Replace(s,"\\\"","",-1)
 	}
+
+	for {
+		if strings.Contains(s, "\"") {
+			l := strings.Index(s, "\"")
+			r := strings.Index(s[l+1:], "\"") + (l+1) + 1
+			if r == -1 || len(s) < r {
+				s = s[:l]
+			} else {
+				s = s[:l] + s[r:]
+			}
+		} else {
+			break
+		}
+	}
+
+	for {
+		if strings.Contains(s, "'") {
+			l := strings.Index(s, "'")
+			r := strings.Index(s[l+1:], "'") + (l+1) + 1
+			if r == -1 || len(s) < r {
+				s = s[:l]
+			} else {
+				s = s[:l] + s[r:]
+			}
+		} else {
+			break
+		}
+	}
+
+	for {
+		if strings.Contains(s, "/*") && strings.Contains(s,"*/") {
+			l := strings.Index(s, "/*")
+			r := strings.Index(s[l+1:], "*/") + (l+1) + 2
+			if len(s) < r {
+				s = s[:l]
+			} else {
+				s = s[:l] + s[r:]
+			}
+		} else {
+			break
+		}
+	}
+
+	if strings.Contains(s,"/*") {
+		l := strings.Index(s, "/*")
+		s = s[:l]
+	}
+
+	if strings.Contains(s,"*/") {
+		r := strings.Index(s, "*/") + 2
+		if len(s) < r {
+			s = ""
+		} else {
+			s = s[r:]
+		}
+	}
+
+	if strings.Contains(s, "//") {
+		s = strings.Split(s, "//")[0]
+	}
+
+	return s
 }
 
 func (t *Trace) get_decls_by_raw(path string) Decls {
@@ -56,9 +113,10 @@ func (t *Trace) get_decls_by_raw(path string) Decls {
 		panic(err.Error())
 	}
 
-	scope := 0
+	global_scope := 0
+	module_scope:= 0
+
 	var line uint32 = 0
-	comment := false
 
 	var decls Decls
 	var func_decl []string
@@ -67,62 +125,54 @@ func (t *Trace) get_decls_by_raw(path string) Decls {
 		ln := sc.Text()
 		line += 1
 
-		if strings.Contains(ln, "/*") {
-			comment = true
+		real_ln := exclude(ln)
+
+		if real_ln == "" {
+			continue
 		}
 
-		if strings.Contains(ln, "*/") {
-			comment = false
-		}
-
-		if !comment {
-
-			real_ln := ""
-			if strings.Contains(ln, "/*") && strings.Contains(ln, "*/") {
-				real_ln = exclude_middle_comment(ln)
-			} else if strings.Contains(ln, "*/") {
-				real_ln = strings.Split(ln, "*/")[1]
+		if ( global_scope - module_scope ) == 0 {
+			if is_not_func(real_ln) {
+				reset(&func_decl)
 			} else {
-				real_ln = ln
-			}
-
-			if strings.Contains(ln, "//") {
-				real_ln = strings.Split(real_ln, "//")[0]
-			}
-
-			if real_ln == "" {
-				continue
-			}
-
-			if scope == 0 {
-				if is_not_func(real_ln) {
-					reset(&func_decl)
-				} else {
-					func_decl = append(func_decl, real_ln)
-				}
-			}
-
-			if c := strings.Count(real_ln, "{"); c > 0 {
-				scope += c
-			}
-
-			if c := strings.Count(real_ln, "}"); c > 0 {
-				scope -= c
-
-				if scope == 0 && len(func_decl) > 0 {
-
-					if func_name := get_func_name(func_decl); func_name == "" {
-						//fmt.Println("No function name found.")
-					} else {
-						decls = append(decls, Decl{line, clang.Cursor_FunctionDecl, func_name})
-					}
-					reset(&func_decl)
-				}
+				func_decl = append(func_decl, real_ln)
 			}
 		}
 
-		if scope < 0 {
-			fmt.Println(line)
+		if c := strings.Count(real_ln, "{"); c > 0 {
+
+			if ( global_scope - module_scope ) == 0 {
+				if strings.Contains(real_ln, "namespace") ||
+					strings.Contains(real_ln, "extern") {
+					module_scope += 1
+				}
+			}
+
+			global_scope += c
+			//fmt.Println(path,line,"+",global_scope)
+		}
+
+		if c := strings.Count(real_ln, "}"); c > 0 {
+			global_scope -= c
+			//fmt.Println(path,line,"-",global_scope)
+
+			if global_scope < module_scope {
+				module_scope -= 1
+			}
+
+			if ( global_scope - module_scope ) == 0 && len(func_decl) > 0 {
+
+				if func_name := get_func_name(func_decl); func_name == "" {
+					//fmt.Println("No function name found.")
+				} else {
+					decls = append(decls, Decl{line, clang.Cursor_FunctionDecl, func_name})
+				}
+				reset(&func_decl)
+			}
+		}
+
+		if global_scope < 0 {
+			fmt.Println(path,line)
 			panic("Scope must not be negative.")
 		}
 	}

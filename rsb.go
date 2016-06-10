@@ -238,10 +238,11 @@ func (t *Trace) read_nth_func(path string) {
 	}
 	sc := bufio.NewScanner(fd)
 
-	scope := 0
+	global_scope := 0
+	module_scope:= 0
+
 	var lines uint32 = 0
 	var last_decl_line uint32 = 1
-	comment := false
 
 	re_callee, _ := regexp.Compile("\\w+")
 
@@ -249,43 +250,39 @@ func (t *Trace) read_nth_func(path string) {
 		ln := sc.Text()
 		lines += 1
 
-		if strings.Contains(ln, "/*") {
-			comment = true
+		real_ln := exclude(ln)
+
+		if real_ln == "" {
+			continue
 		}
 
-		if strings.Contains(ln, "*/") {
-			comment = false
+		if c := strings.Count(real_ln, "{"); c > 0 {
+
+			if ( global_scope - module_scope ) == 0 {
+				if strings.Contains(real_ln, "namespace") ||
+					strings.Contains(real_ln, "extern") {
+					module_scope += 1
+				}
+			}
+
+			global_scope += c
 		}
 
-		if !comment {
+		if c := strings.Count(real_ln, "}"); c > 0 {
+			global_scope -= c
 
-			real_ln := ""
-			if strings.Contains(ln, "/*") && strings.Contains(ln, "*/") {
-				real_ln = exclude_middle_comment(ln)
-			} else if strings.Contains(ln, "*/") {
-				real_ln = strings.Split(ln, "*/")[1]
-			} else {
-				real_ln = ln
+			if global_scope < module_scope {
+				module_scope -= 1
 			}
 
-			if real_ln == "" {
-				continue
-			}
 
-			if c := strings.Count(real_ln, "{"); c > 0 {
-				scope += c
-			}
+		}
 
-			if c := strings.Count(real_ln, "}"); c > 0 {
-				scope -= c
-			}
-
-			if scope > 0 && strings.Contains(real_ln, t.callee.fun) {
-				for _, str := range re_callee.FindAllString(real_ln, -1) {
-					if str == t.callee.fun {
-						last_decl_line = t.go_walk(path, lines, decls, last_decl_line)
-						break
-					}
+		if ( global_scope - module_scope ) > 0 && strings.Contains(real_ln, t.callee.fun) {
+			for _, str := range re_callee.FindAllString(real_ln, -1) {
+				if str == t.callee.fun {
+					last_decl_line = t.go_walk(path, lines, decls, last_decl_line)
+					break
 				}
 			}
 		}
