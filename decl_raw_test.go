@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestGet_decl_by_raw(t *testing.T) {
+func TestGetDeclByRaw(t *testing.T) {
 
 	tmp := ".tmp"
 	source := `
@@ -62,7 +62,7 @@ static struct ccchar *baz ( char *i, struct *tree ) {
 	}
 
 	trace := Trace{}
-	if reflect.DeepEqual(decls, trace.get_decls_by_raw(".tmp")) {
+	if reflect.DeepEqual(decls, trace.getDeclsByRaw(".tmp")) {
 		t.Errorf("Failed.")
 	}
 

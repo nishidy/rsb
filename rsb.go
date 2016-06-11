@@ -69,19 +69,19 @@ func (d Decls) Swap(i, j int) {
 	d[i], d[j] = d[j], d[i]
 }
 
-func (t *Trace) make_decls(path string) Decls {
+func (t *Trace) makeDecls(path string) Decls {
 	var decls Decls
 	if true {
-		decls = t.get_decls_by_raw(path)
+		decls = t.getDeclsByRaw(path)
 	} else {
-		decls = t.get_decls_by_clang(path)
+		decls = t.getDeclsByClang(path)
 	}
 	return decls
 }
 
-func (t *Trace) read_1st_func(path string) {
+func (t *Trace) read1stFunc(path string) {
 
-	decls := t.make_decls(path)
+	decls := t.makeDecls(path)
 	(*t.decls_db)[path] = decls
 
 	for _, decl := range decls {
@@ -101,14 +101,14 @@ func (t *Trace) read_1st_func(path string) {
 			}
 
 			if cache {
-				print_cached_result(path, decl.name)
+				printCachedResult(path, decl.name)
 			}
 
 			callee := Callee{decl.name, path, decl.line}
 			trace := Trace{t.dir, Entry{}, callee, 2, t.maxlevel, result, nil, t.wg, t.mtx, t.decls_db}
 			t.nodes = append(t.nodes, &trace)
 
-			filepath.Walk(trace.dir, trace.recur_visit)
+			filepath.Walk(trace.dir, trace.recurVisit)
 
 			break
 		}
@@ -117,7 +117,7 @@ func (t *Trace) read_1st_func(path string) {
 
 }
 
-func (t *Trace) recur_visit(path string, info os.FileInfo, err error) error {
+func (t *Trace) recurVisit(path string, info os.FileInfo, err error) error {
 
 	file := filepath.Base(path)
 
@@ -130,17 +130,17 @@ func (t *Trace) recur_visit(path string, info os.FileInfo, err error) error {
 		if ext == "c" || ext == "h" {
 			if t.level == 1 {
 				if t.entry.file == path {
-					t.read_1st_func(path)
+					t.read1stFunc(path)
 				}
 			} else if t.level <= t.maxlevel {
-				t.read_nth_func(path)
+				t.readNthFunc(path)
 			}
 		}
 	}
 	return nil
 }
 
-func get_home_env() string {
+func getHomeEnv() string {
 	for _, env := range os.Environ() {
 		if strings.Contains(env, "HOME=") {
 			return strings.Split(env, "=")[1]
@@ -149,27 +149,27 @@ func get_home_env() string {
 	return ""
 }
 
-func get_hashed_dir(file_path, func_name string) string {
+func getHashedDir(file_path, func_name string) string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(file_path+func_name)))
 }
 
-func dir_exists(abs_path string) bool {
+func dirExists(abs_path string) bool {
 	_, err := os.Stat(abs_path)
 	return err == nil
 }
 
-func get_abs_hashed_dir(file_path, func_name string) string {
-	home_path := get_home_env()
-	hashed_dir := get_hashed_dir(file_path, func_name)
+func getAbsHashedDir(file_path, func_name string) string {
+	home_path := getHomeEnv()
+	hashed_dir := getHashedDir(file_path, func_name)
 	abs_hashed_dir := filepath.Join(home_path, BTHOME, hashed_dir)
 	return abs_hashed_dir
 }
 
 func get_cached_result(file_path, func_name string) (string, error) {
 
-	abs_hashed_dir := get_abs_hashed_dir(file_path, func_name)
+	abs_hashed_dir := getAbsHashedDir(file_path, func_name)
 
-	if dir_exists(abs_hashed_dir) {
+	if dirExists(abs_hashed_dir) {
 		result, err := ioutil.ReadFile(filepath.Join(abs_hashed_dir, "result"))
 		if err != nil {
 			os.Exit(12)
@@ -181,7 +181,7 @@ func get_cached_result(file_path, func_name string) (string, error) {
 
 }
 
-func print_cached_result(path, func_name string) {
+func printCachedResult(path, func_name string) {
 
 	file_path, err := filepath.Abs(path)
 	if err != nil {
@@ -197,12 +197,12 @@ func print_cached_result(path, func_name string) {
 	}
 }
 
-func save_result(trace *Trace, results *[]string) {
+func saveResult(trace *Trace, results *[]string) {
 	file_path, _ := filepath.Abs(trace.entry.file)
 	func_name := trace.nodes[0].callee.fun
-	abs_hashed_dir := get_abs_hashed_dir(file_path, func_name)
+	abs_hashed_dir := getAbsHashedDir(file_path, func_name)
 
-	if dir_exists(abs_hashed_dir) {
+	if dirExists(abs_hashed_dir) {
 		os.RemoveAll(abs_hashed_dir)
 		fmt.Println("# Overwrite the cache.")
 	}
@@ -217,14 +217,14 @@ func save_result(trace *Trace, results *[]string) {
 	ioutil.WriteFile(filepath.Join(abs_hashed_dir, "result"), []byte(result), 0400)
 }
 
-func (t *Trace) read_nth_func(path string) {
+func (t *Trace) readNthFunc(path string) {
 
 	var decls Decls
 
 	if _, ok := (*t.decls_db)[path]; ok {
 		decls = (*t.decls_db)[path]
 	} else {
-		decls = t.make_decls(path)
+		decls = t.makeDecls(path)
 		(*t.mtx).Lock()
 		(*t.decls_db)[path] = decls
 		(*t.mtx).Unlock()
@@ -281,7 +281,7 @@ func (t *Trace) read_nth_func(path string) {
 		if ( global_scope - module_scope ) > 0 && strings.Contains(real_ln, t.callee.fun) {
 			for _, str := range re_callee.FindAllString(real_ln, -1) {
 				if str == t.callee.fun {
-					last_decl_line = t.go_walk(path, lines, decls, last_decl_line)
+					last_decl_line = t.goWalk(path, lines, decls, last_decl_line)
 					break
 				}
 			}
@@ -289,7 +289,7 @@ func (t *Trace) read_nth_func(path string) {
 	}
 }
 
-func (t *Trace) go_walk(path string, lines uint32, decls Decls, last_decl_line uint32) uint32 {
+func (t *Trace) goWalk(path string, lines uint32, decls Decls, last_decl_line uint32) uint32 {
 
 	var decl_line uint32 = 1
 
@@ -315,7 +315,7 @@ func (t *Trace) go_walk(path string, lines uint32, decls Decls, last_decl_line u
 						t.nodes = append(t.nodes, &trace)
 
 						if decl.line != last_decl_line {
-							go t.new_walk(&trace)
+							go t.newWalk(&trace)
 						}
 					}
 
@@ -348,13 +348,13 @@ func (t *Trace) go_walk(path string, lines uint32, decls Decls, last_decl_line u
 
 }
 
-func (t *Trace) new_walk(trace *Trace) {
+func (t *Trace) newWalk(trace *Trace) {
 	t.wg.Add(1)
-	filepath.Walk(t.dir, trace.recur_visit)
+	filepath.Walk(t.dir, trace.recurVisit)
 	t.wg.Done()
 }
 
-func get_struct_name(ln string) []string {
+func getStructName(ln string) []string {
 	re_struct, _ := regexp.Compile("^\\w+ *\\w+ struct +(\\w+) .*=")
 	if re_struct.FindString(ln) == "" {
 		re_struct_b, _ := regexp.Compile("^struct +(\\w+) *{")
@@ -368,17 +368,17 @@ func get_struct_name(ln string) []string {
 	}
 }
 
-func down_tree(root *Trace, results *[]string) {
+func downTree(root *Trace, results *[]string) {
 	if root.result == "" {
 	} else {
 		*results = append(*results, root.result)
 		for _, node := range root.nodes {
-			down_tree(node, results)
+			downTree(node, results)
 		}
 	}
 }
 
-func remove_ansi_code(str string) string {
+func removeAnsiCode(str string) string {
 	str_raw := str
 	str_raw = strings.Replace(str_raw, "\x1b[34m", "", -1)
 	str_raw = strings.Replace(str_raw, "\x1b[31m", "", -1)
@@ -386,11 +386,11 @@ func remove_ansi_code(str string) string {
 	return str_raw
 }
 
-func show_result(results []string) {
+func showResult(results []string) {
 	for _, str := range results {
 		real_str := "!"
 		if vim {
-			real_str = remove_ansi_code(str)
+			real_str = removeAnsiCode(str)
 		} else {
 			real_str = str
 		}
@@ -462,11 +462,11 @@ func main() {
 	entry := Entry{file, uint32(line)}
 	trace := Trace{dir, entry, Callee{}, 1, maxlevel, ent, nil, wg, mtx, &decls_db}
 
-	filepath.Walk(trace.dir, trace.recur_visit)
+	filepath.Walk(trace.dir, trace.recurVisit)
 	trace.wg.Wait()
 
 	results := []string{}
-	down_tree(&trace, &results)
+	downTree(&trace, &results)
 
 	if !raw {
 		term := NewTerm(results)
@@ -474,9 +474,9 @@ func main() {
 	}
 
 	// Not important to show the first one
-	show_result(results[1:])
+	showResult(results[1:])
 
 	if cache {
-		save_result(&trace, &results)
+		saveResult(&trace, &results)
 	}
 }

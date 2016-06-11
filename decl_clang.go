@@ -7,7 +7,7 @@ import (
 )
 
 // TODO : Should find the last line of function body
-func (t *Trace) get_decls_by_clang(path string) Decls {
+func (t *Trace) getDeclsByClang(path string) Decls {
 
 	idx := clang.NewIndex(1, 0)
 	defer idx.Dispose()

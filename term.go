@@ -52,7 +52,7 @@ func (t *Term) exec() {
 	}
 }
 
-func replace_ansi_code(str string) string {
+func replaceAnsiCode(str string) string {
 	str_raw := str
 	str_raw = strings.Replace(str_raw, "\x1b[34m", "|", -1)
 	str_raw = strings.Replace(str_raw, "\x1b[31m", "~", -1)
@@ -60,7 +60,7 @@ func replace_ansi_code(str string) string {
 	return str_raw
 }
 
-func draw_title(str_raw string, bgcolor termbox.Attribute, y int) {
+func drawTitle(str_raw string, bgcolor termbox.Attribute, y int) {
 	color := termbox.ColorDefault
 	x := 0
 	for _, r := range str_raw {
@@ -68,7 +68,7 @@ func draw_title(str_raw string, bgcolor termbox.Attribute, y int) {
 		x += 1
 	}
 }
-func draw_line(str_raw string, bgcolor termbox.Attribute, y int) {
+func drawLine(str_raw string, bgcolor termbox.Attribute, y int) {
 	color := termbox.ColorDefault
 	x := 0
 	for _, r := range str_raw {
@@ -93,7 +93,7 @@ func (t *Term) draw() {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 
 	exp := "# Available keys: vim[enter] up[↓/C-j] down[↑/C-k] head[C-h] bottom[C-b] quit[Esc/C-q]"
-	draw_title(exp, termbox.ColorDefault, 0)
+	drawTitle(exp, termbox.ColorDefault, 0)
 
 	for y, str := range t.strs[t.ybase:] {
 		bgcolor := termbox.ColorDefault
@@ -102,8 +102,8 @@ func (t *Term) draw() {
 			bgcolor = termbox.ColorWhite
 		}
 
-		str_raw := replace_ansi_code(str)
-		draw_line(str_raw, bgcolor, y)
+		str_raw := replaceAnsiCode(str)
+		drawLine(str_raw, bgcolor, y)
 	}
 
 	termbox.Flush()

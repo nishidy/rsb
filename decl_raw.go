@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func is_not_func(ln string) bool {
+func isNotFunc(ln string) bool {
 	return strings.ContainsAny(ln, "#;")
 }
 
@@ -16,7 +16,7 @@ func reset(s *[]string) {
 	*s = []string{}
 }
 
-func get_func_name(s []string) string {
+func getFuncName(s []string) string {
 	func_decl := strings.Split(strings.Join(s, " "), "(")
 	if len(func_decl) > 1 {
 		tokens := strings.Split(strings.TrimSpace(func_decl[0]), " ")
@@ -104,7 +104,7 @@ func exclude(s string) string {
 	return s
 }
 
-func (t *Trace) get_decls_by_raw(path string) Decls {
+func (t *Trace) getDeclsByRaw(path string) Decls {
 
 	fd, err := os.Open(path)
 	defer fd.Close()
@@ -132,7 +132,7 @@ func (t *Trace) get_decls_by_raw(path string) Decls {
 		}
 
 		if ( global_scope - module_scope ) == 0 {
-			if is_not_func(real_ln) {
+			if isNotFunc(real_ln) {
 				reset(&func_decl)
 			} else {
 				func_decl = append(func_decl, real_ln)
@@ -162,7 +162,7 @@ func (t *Trace) get_decls_by_raw(path string) Decls {
 
 			if ( global_scope - module_scope ) == 0 && len(func_decl) > 0 {
 
-				if func_name := get_func_name(func_decl); func_name == "" {
+				if func_name := getFuncName(func_decl); func_name == "" {
 					//fmt.Println("No function name found.")
 				} else {
 					decls = append(decls, Decl{line, clang.Cursor_FunctionDecl, func_name})
