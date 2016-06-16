@@ -258,9 +258,7 @@ func (t *Trace) readNthFunc(path string) {
 		lines += 1
 
 		real_ln = exclude(ln)
-
 		real_ln, comment_start = exclude_comment_start(real_ln)
-
 		real_ln, comment_end = exclude_comment_end(real_ln)
 
 		if comment_end {
