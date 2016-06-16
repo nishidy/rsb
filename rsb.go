@@ -407,7 +407,7 @@ func removeAnsiCode(str string) string {
 	return str_raw
 }
 
-func showResult(shows []ShowInfo) {
+func showResult(shows ShowsInfo) {
 	for _, show := range shows {
 		real_str := "!"
 		if vim {

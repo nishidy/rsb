@@ -15,7 +15,7 @@ type Term struct {
 	head  []string
 }
 
-func NewTerm(shows []ShowInfo) Term {
+func NewTerm(shows ShowsInfo) Term {
 	term := Term{0, 0, []string{}, []string{}}
 	for _, show := range shows[1:] {
 		term.strs = append(term.strs, show.result)
