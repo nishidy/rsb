@@ -57,32 +57,23 @@ static struct ccchar *baz ( char *i, struct *tree ) {
 	file.Write([]byte(source))
 
 	decls := Decls{
-		Decl{6, clang.Cursor_FunctionDecl, "hoge", ""},
-		Decl{15, clang.Cursor_FunctionDecl, "get_human", ""},
-		Decl{37, clang.Cursor_FunctionDecl, "baz", ""},
+		Decl{6, clang.Cursor_FunctionDecl, "hoge", "int hoge(int i, int *j) {"},
+		Decl{15, clang.Cursor_FunctionDecl, "get_human", "struct human *get_human() {"},
+		Decl{37, clang.Cursor_FunctionDecl, "baz", "static struct ccchar *baz ( char *i, struct *tree ) {"},
 	}
 
 	trace := Trace{}
 	test_decls := trace.getDeclsByRaw(".tmp")
 	if !reflect.DeepEqual(decls, test_decls) {
-		for i := 0; i < len(decls); i++ {
-			if decls[i].line == test_decls[i].line &&
-				decls[i].kind == test_decls[i].kind &&
-				decls[i].name == test_decls[i].name {
-			} else {
-				t.Errorf("Failed.")
-				fmt.Println("Assumed result.")
-				for i, decl := range decls {
-					fmt.Println(i, decl.line, decl.kind, decl.name, decl.head)
-				}
-				fmt.Println("\nActual result.")
-				for i, decl := range test_decls {
-					fmt.Println(i, decl.line, decl.kind, decl.name, decl.head)
-				}
-				break
-			}
+		t.Errorf("Failed.")
+		fmt.Println("Assumed result.")
+		for i, decl := range decls {
+			fmt.Println(i, decl.line, decl.kind, decl.name, decl.head)
 		}
-
+		fmt.Println("\nActual result.")
+		for i, decl := range test_decls {
+			fmt.Println(i, decl.line, decl.kind, decl.name, decl.head)
+		}
 	}
 
 	os.Remove(tmp)

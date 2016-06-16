@@ -182,6 +182,7 @@ func (t *Trace) getDeclsByRaw(path string) Decls {
 					if strings.Contains(real_ln, "namespace") ||
 						strings.Contains(real_ln, "extern") {
 						module_scope += 1
+						reset(&decl_slice)
 					}
 				}
 
@@ -199,7 +200,7 @@ func (t *Trace) getDeclsByRaw(path string) Decls {
 
 				if (global_scope-module_scope) == 0 && len(decl_slice) > 0 {
 
-					decl_str := strings.Join(decl_slice, " ")
+					decl_str := strings.TrimSpace(strings.Join(decl_slice, " "))
 					if func_name := getFuncName(decl_str); func_name == "" {
 						//fmt.Println("No function name found.")
 						if struct_name := getStructName(decl_str); struct_name == "" {
