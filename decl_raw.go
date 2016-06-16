@@ -16,8 +16,20 @@ func reset(s *[]string) {
 	*s = []string{}
 }
 
-func getFuncName(s []string) string {
-	func_decl := strings.Split(strings.Join(s, " "), "(")
+func getStructName(s string) string {
+	tokens := strings.Split(s, " ")
+	for i, token := range tokens {
+		if token == "struct" {
+			if i < len(tokens)-2 {
+				return tokens[i+2]
+			}
+		}
+	}
+	return ""
+}
+
+func getFuncName(s string) string {
+	func_decl := strings.Split(s, "(")
 	if len(func_decl) > 1 {
 		tokens := strings.Split(strings.TrimSpace(func_decl[0]), " ")
 		if len(tokens) > 0 {
@@ -38,13 +50,13 @@ func getFuncName(s []string) string {
 
 func exclude(s string) string {
 	if strings.Contains(s, "\\\"") {
-		s = strings.Replace(s,"\\\"","",-1)
+		s = strings.Replace(s, "\\\"", "", -1)
 	}
 
 	for {
 		if strings.Contains(s, "\"") {
 			l := strings.Index(s, "\"")
-			r := strings.Index(s[l+1:], "\"") + (l+1) + 1
+			r := strings.Index(s[l+1:], "\"") + (l + 1) + 1
 			if r == -1 || len(s) < r {
 				s = s[:l]
 			} else {
@@ -58,7 +70,7 @@ func exclude(s string) string {
 	for {
 		if strings.Contains(s, "'") {
 			l := strings.Index(s, "'")
-			r := strings.Index(s[l+1:], "'") + (l+1) + 1
+			r := strings.Index(s[l+1:], "'") + (l + 1) + 1
 			if r == -1 || len(s) < r {
 				s = s[:l]
 			} else {
@@ -70,9 +82,9 @@ func exclude(s string) string {
 	}
 
 	for {
-		if strings.Contains(s, "/*") && strings.Contains(s,"*/") {
+		if strings.Contains(s, "/*") && strings.Contains(s, "*/") {
 			l := strings.Index(s, "/*")
-			r := strings.Index(s[l+1:], "*/") + (l+1) + 2
+			r := strings.Index(s[l+1:], "*/") + (l + 1) + 2
 			if len(s) < r {
 				s = s[:l]
 			} else {
@@ -83,25 +95,37 @@ func exclude(s string) string {
 		}
 	}
 
-	if strings.Contains(s,"/*") {
-		l := strings.Index(s, "/*")
-		s = s[:l]
+	if strings.Contains(s, "//") {
+		s = strings.Split(s, "//")[0]
 	}
 
-	if strings.Contains(s,"*/") {
+	return s
+}
+
+func exclude_comment_start(s string) (string, bool) {
+	comment_start := false
+	if strings.Contains(s, "/*") {
+		l := strings.Index(s, "/*")
+		s = s[:l]
+		comment_start = true
+	}
+
+	return s, comment_start
+}
+
+func exclude_comment_end(s string) (string, bool) {
+	comment_end := false
+	if strings.Contains(s, "*/") {
 		r := strings.Index(s, "*/") + 2
 		if len(s) < r {
 			s = ""
 		} else {
 			s = s[r:]
 		}
+		comment_end = true
 	}
 
-	if strings.Contains(s, "//") {
-		s = strings.Split(s, "//")[0]
-	}
-
-	return s
+	return s, comment_end
 }
 
 func (t *Trace) getDeclsByRaw(path string) Decls {
@@ -114,67 +138,92 @@ func (t *Trace) getDeclsByRaw(path string) Decls {
 	}
 
 	global_scope := 0
-	module_scope:= 0
+	module_scope := 0
 
 	var line uint32 = 0
 
 	var decls Decls
-	var func_decl []string
+	var decl_slice []string
 	sc := bufio.NewScanner(fd)
+
+	real_ln := ""
+	comment := false
+	comment_start := false
+	comment_end := false
+
 	for sc.Scan() {
+
 		ln := sc.Text()
 		line += 1
 
-		real_ln := exclude(ln)
+		real_ln = exclude(ln)
 
-		if real_ln == "" {
-			continue
+		real_ln, comment_start = exclude_comment_start(real_ln)
+
+		real_ln, comment_end = exclude_comment_end(real_ln)
+
+		if comment_end {
+			comment = false
 		}
 
-		if ( global_scope - module_scope ) == 0 {
-			if isNotFunc(real_ln) {
-				reset(&func_decl)
-			} else {
-				func_decl = append(func_decl, real_ln)
-			}
-		}
+		if !comment {
 
-		if c := strings.Count(real_ln, "{"); c > 0 {
-
-			if ( global_scope - module_scope ) == 0 {
-				if strings.Contains(real_ln, "namespace") ||
-					strings.Contains(real_ln, "extern") {
-					module_scope += 1
-				}
-			}
-
-			global_scope += c
-			//fmt.Println(path,line,"+",global_scope)
-		}
-
-		if c := strings.Count(real_ln, "}"); c > 0 {
-			global_scope -= c
-			//fmt.Println(path,line,"-",global_scope)
-
-			if global_scope < module_scope {
-				module_scope -= 1
-			}
-
-			if ( global_scope - module_scope ) == 0 && len(func_decl) > 0 {
-
-				if func_name := getFuncName(func_decl); func_name == "" {
-					//fmt.Println("No function name found.")
+			if (global_scope - module_scope) == 0 {
+				if isNotFunc(real_ln) {
+					reset(&decl_slice)
 				} else {
-					decls = append(decls, Decl{line, clang.Cursor_FunctionDecl, func_name})
+					decl_slice = append(decl_slice, real_ln)
 				}
-				reset(&func_decl)
+			}
+
+			if c := strings.Count(real_ln, "{"); c > 0 {
+
+				if (global_scope - module_scope) == 0 {
+					if strings.Contains(real_ln, "namespace") ||
+						strings.Contains(real_ln, "extern") {
+						module_scope += 1
+					}
+				}
+
+				global_scope += c
+				//fmt.Println(path,line,"+",global_scope)
+			}
+
+			if c := strings.Count(real_ln, "}"); c > 0 {
+				global_scope -= c
+				//fmt.Println(path,line,"-",global_scope)
+
+				if global_scope < module_scope {
+					module_scope -= 1
+				}
+
+				if (global_scope-module_scope) == 0 && len(decl_slice) > 0 {
+
+					decl_str := strings.Join(decl_slice, " ")
+					if func_name := getFuncName(decl_str); func_name == "" {
+						//fmt.Println("No function name found.")
+						if struct_name := getStructName(decl_str); struct_name == "" {
+							//fmt.Println("No struct name found.")
+						} else {
+							decls = append(decls, Decl{line, clang.Cursor_StructDecl, struct_name, decl_str})
+						}
+					} else {
+						decls = append(decls, Decl{line, clang.Cursor_FunctionDecl, func_name, decl_str})
+					}
+					reset(&decl_slice)
+				}
+			}
+
+			if global_scope < 0 {
+				fmt.Println(path, line)
+				panic("Scope must not be negative.")
 			}
 		}
 
-		if global_scope < 0 {
-			fmt.Println(path,line)
-			panic("Scope must not be negative.")
+		if comment_start {
+			comment = true
 		}
+
 	}
 
 	return decls

@@ -12,12 +12,14 @@ type Term struct {
 	yabs  int
 	ybase int
 	strs  []string
+	head  []string
 }
 
-func NewTerm(results []string) Term {
-	term := Term{0, 0, []string{}}
-	for _, result := range results[1:] {
-		term.strs = append(term.strs, result)
+func NewTerm(shows []ShowInfo) Term {
+	term := Term{0, 0, []string{}, []string{}}
+	for _, show := range shows[1:] {
+		term.strs = append(term.strs, show.result)
+		term.head = append(term.strs, show.head)
 	}
 
 	return term

@@ -7,6 +7,7 @@ import (
 )
 
 // TODO : Should find the last line of function body
+// TODO : Should find the declaration of function (head)
 func (t *Trace) getDeclsByClang(path string) Decls {
 
 	idx := clang.NewIndex(1, 0)
@@ -22,9 +23,9 @@ func (t *Trace) getDeclsByClang(path string) Decls {
 
 		switch cursor.Kind() {
 		case clang.Cursor_FunctionDecl:
-			decls = append(decls, Decl{lines, clang.Cursor_FunctionDecl, cursor.Spelling()})
+			decls = append(decls, Decl{lines, clang.Cursor_FunctionDecl, cursor.Spelling(), ""})
 		case clang.Cursor_StructDecl:
-			decls = append(decls, Decl{lines, clang.Cursor_StructDecl, cursor.Spelling()})
+			decls = append(decls, Decl{lines, clang.Cursor_StructDecl, cursor.Spelling(), ""})
 		}
 
 		switch cursor.Kind() {
