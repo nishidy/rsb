@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/go-clang/bootstrap/clang"
 	"os"
 	"reflect"
@@ -10,8 +11,7 @@ import (
 func TestGetDeclByRaw(t *testing.T) {
 
 	tmp := ".tmp"
-	source := `
-#include <stdio.h>
+	source := `#include <stdio.h>
 
 namespace test {
 	int hoge(int i, int *j) { // test code
@@ -58,12 +58,30 @@ static struct ccchar *baz ( char *i, struct *tree ) {
 	decls := Decls{
 		Decl{6, clang.Cursor_FunctionDecl, "hoge", ""},
 		Decl{15, clang.Cursor_FunctionDecl, "get_human", ""},
-		Decl{35, clang.Cursor_FunctionDecl, "baz", ""},
+		Decl{36, clang.Cursor_FunctionDecl, "baz", ""},
 	}
 
 	trace := Trace{}
-	if !reflect.DeepEqual(decls, trace.getDeclsByRaw(".tmp")) {
-		t.Errorf("Failed.")
+	test_decls := trace.getDeclsByRaw(".tmp")
+	if !reflect.DeepEqual(decls, test_decls) {
+		for i := 0; i < len(decls); i++ {
+			if decls[i].line == test_decls[i].line &&
+				decls[i].kind == test_decls[i].kind &&
+				decls[i].name == test_decls[i].name {
+			} else {
+				t.Errorf("Failed.")
+				fmt.Println("Assumed result.")
+				for i, decl := range decls {
+					fmt.Println(i, decl.line, decl.kind, decl.name, decl.head)
+				}
+				fmt.Println("\nActual result.")
+				for i, decl := range test_decls {
+					fmt.Println(i, decl.line, decl.kind, decl.name, decl.head)
+				}
+				break
+			}
+		}
+
 	}
 
 	os.Remove(tmp)
