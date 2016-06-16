@@ -41,6 +41,7 @@ static struct ccchar *baz ( char *i, struct *tree ) {
 			/* //
 		"test code" */
 		while() { /*
+		* test
 		*/ }
 		return *x;
 	} else {
@@ -58,7 +59,7 @@ static struct ccchar *baz ( char *i, struct *tree ) {
 	decls := Decls{
 		Decl{6, clang.Cursor_FunctionDecl, "hoge", ""},
 		Decl{15, clang.Cursor_FunctionDecl, "get_human", ""},
-		Decl{36, clang.Cursor_FunctionDecl, "baz", ""},
+		Decl{37, clang.Cursor_FunctionDecl, "baz", ""},
 	}
 
 	trace := Trace{}
