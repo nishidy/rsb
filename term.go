@@ -9,17 +9,20 @@ import (
 )
 
 type Term struct {
-	yabs  int
-	ybase int
-	strs  []string
-	head  []string
+	yabs     int
+	ybase    int
+	strs     []string
+	heads    []string
+	levels   []int
+	showHead bool
 }
 
 func NewTerm(shows ShowsInfo) Term {
-	term := Term{0, 0, []string{}, []string{}}
+	term := Term{0, 0, []string{}, []string{}, []int{}, false}
 	for _, show := range shows[1:] {
 		term.strs = append(term.strs, show.result)
-		term.head = append(term.strs, show.head)
+		term.heads = append(term.heads, show.head)
+		term.levels = append(term.levels, show.level)
 	}
 
 	return term
@@ -35,6 +38,10 @@ func getFuncLine(s string) (string, string) {
 		}
 	}
 	return "", ""
+}
+
+func (t *Term) showHeadToggle() {
+	t.showHead = !t.showHead
 }
 
 func (t *Term) exec() {
@@ -54,6 +61,7 @@ func (t *Term) exec() {
 	}
 }
 
+// This is a hack to color a range
 func replaceAnsiCode(str string) string {
 	str_raw := str
 	str_raw = strings.Replace(str_raw, "\x1b[34m", "|", -1)
@@ -70,7 +78,14 @@ func drawTitle(str_raw string, bgAttr termbox.Attribute, y int) {
 		x += 1
 	}
 }
-func drawLine(str_raw string, bgAttr termbox.Attribute, y int) {
+
+func drawAHead(str_raw string, bgAttr termbox.Attribute, y int) {
+	for x, r := range str_raw {
+		termbox.SetCell(x, y+1, r, termbox.ColorYellow, bgAttr)
+	}
+}
+
+func drawALine(str_raw string, bgAttr termbox.Attribute, y int) {
 	color := termbox.ColorDefault
 	x := 0
 	for _, r := range str_raw {
@@ -94,9 +109,10 @@ func drawLine(str_raw string, bgAttr termbox.Attribute, y int) {
 func (t *Term) draw() {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 
-	exp := "# Available keys: vim[enter] up[↓/C-j] down[↑/C-k] head[C-h] bottom[C-b] quit[Esc/C-q]"
+	exp := "# Available keys: vim[enter] up[↓/C-j] down[↑/C-k] head[C-h] bottom[C-b] quit[Esc/C-q] header[space]"
 	drawTitle(exp, termbox.ColorDefault, 0)
 
+	show_head := 0
 	for y, str := range t.strs[t.ybase:] {
 		bgAttr := termbox.ColorDefault
 
@@ -105,7 +121,12 @@ func (t *Term) draw() {
 		}
 
 		str_raw := replaceAnsiCode(str)
-		drawLine(str_raw, bgAttr, y)
+		drawALine(str_raw, bgAttr, y+show_head)
+
+		if y == t.yabs-t.ybase && t.showHead {
+			show_head = 1
+			drawAHead(strings.Repeat(" ", t.levels[y]-1)+t.heads[y], termbox.ColorDefault, y+show_head)
+		}
 	}
 
 	termbox.Flush()
@@ -161,6 +182,8 @@ func (t *Term) Run() {
 				termbox.Close()
 				t.Run()
 				return
+			case termbox.KeySpace:
+				t.showHeadToggle()
 			default:
 			}
 		}

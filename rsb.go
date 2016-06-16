@@ -373,6 +373,7 @@ func (t *Trace) newWalk(trace *Trace) {
 type ShowInfo struct {
 	result string
 	head   string
+	level  int
 }
 
 type ShowsInfo []ShowInfo
@@ -391,7 +392,7 @@ func (shows *ShowsInfo) Join(sep string) string {
 func downTree(root *Trace, shows *ShowsInfo) {
 	if root.result == "" {
 	} else {
-		show := ShowInfo{root.result, root.callee.head}
+		show := ShowInfo{root.result, root.callee.head, root.level}
 		*shows = append(*shows, show)
 		for _, node := range root.nodes {
 			downTree(node, shows)
