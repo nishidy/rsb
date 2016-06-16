@@ -167,7 +167,7 @@ func getAbsHashedDir(file_path, func_name string) string {
 	return abs_hashed_dir
 }
 
-func get_cached_result(file_path, func_name string) (string, error) {
+func getCachedResult(file_path, func_name string) (string, error) {
 
 	abs_hashed_dir := getAbsHashedDir(file_path, func_name)
 
@@ -190,7 +190,7 @@ func printCachedResult(path, func_name string) {
 		os.Exit(10)
 	}
 
-	result, err := get_cached_result(file_path, func_name)
+	result, err := getCachedResult(file_path, func_name)
 	if err != nil {
 	} else {
 		fmt.Println("# Show cached result.")
@@ -258,8 +258,8 @@ func (t *Trace) readNthFunc(path string) {
 		lines += 1
 
 		real_ln = exclude(ln)
-		real_ln, comment_start = exclude_comment_start(real_ln)
-		real_ln, comment_end = exclude_comment_end(real_ln)
+		real_ln, comment_start = excludeCommentStart(real_ln)
+		real_ln, comment_end = excludeCommentEnd(real_ln)
 
 		if comment_end {
 			comment = false

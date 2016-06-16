@@ -102,7 +102,7 @@ func exclude(s string) string {
 	return s
 }
 
-func exclude_comment_start(s string) (string, bool) {
+func excludeCommentStart(s string) (string, bool) {
 	comment_start := false
 	if strings.Contains(s, "/*") {
 		l := strings.Index(s, "/*")
@@ -113,7 +113,7 @@ func exclude_comment_start(s string) (string, bool) {
 	return s, comment_start
 }
 
-func exclude_comment_end(s string) (string, bool) {
+func excludeCommentEnd(s string) (string, bool) {
 	comment_end := false
 	if strings.Contains(s, "*/") {
 		r := strings.Index(s, "*/") + 2
@@ -157,8 +157,8 @@ func (t *Trace) getDeclsByRaw(path string) Decls {
 		line += 1
 
 		real_ln = exclude(ln)
-		real_ln, comment_start = exclude_comment_start(real_ln)
-		real_ln, comment_end = exclude_comment_end(real_ln)
+		real_ln, comment_start = excludeCommentStart(real_ln)
+		real_ln, comment_end = excludeCommentEnd(real_ln)
 
 		if comment_end {
 			comment = false

@@ -25,7 +25,7 @@ func NewTerm(shows ShowsInfo) Term {
 	return term
 }
 
-func get_func_line(s string) (string, string) {
+func getFuncLine(s string) (string, string) {
 	for _, str := range strings.Split(s, " ") {
 		if strings.Contains(str, "@L") {
 			str_slice := strings.Split(str, "@L")
@@ -39,7 +39,7 @@ func get_func_line(s string) (string, string) {
 
 func (t *Term) exec() {
 	item := t.strs[t.yabs]
-	file, line := get_func_line(item)
+	file, line := getFuncLine(item)
 	if file != "" && line != "" {
 		vim_path := ""
 		if _, err := os.Stat("/usr/bin/vim"); err == nil {
