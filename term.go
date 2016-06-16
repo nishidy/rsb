@@ -60,15 +60,15 @@ func replaceAnsiCode(str string) string {
 	return str_raw
 }
 
-func drawTitle(str_raw string, bgcolor termbox.Attribute, y int) {
+func drawTitle(str_raw string, bgAttr termbox.Attribute, y int) {
 	color := termbox.ColorDefault
 	x := 0
 	for _, r := range str_raw {
-		termbox.SetCell(x, y, r, color, bgcolor)
+		termbox.SetCell(x, y, r, color, bgAttr)
 		x += 1
 	}
 }
-func drawLine(str_raw string, bgcolor termbox.Attribute, y int) {
+func drawLine(str_raw string, bgAttr termbox.Attribute, y int) {
 	color := termbox.ColorDefault
 	x := 0
 	for _, r := range str_raw {
@@ -84,7 +84,7 @@ func drawLine(str_raw string, bgcolor termbox.Attribute, y int) {
 			color = termbox.ColorDefault
 			continue
 		}
-		termbox.SetCell(x, y+1, r, color, bgcolor)
+		termbox.SetCell(x, y+1, r, color, bgAttr)
 		x += 1
 	}
 }
@@ -96,14 +96,14 @@ func (t *Term) draw() {
 	drawTitle(exp, termbox.ColorDefault, 0)
 
 	for y, str := range t.strs[t.ybase:] {
-		bgcolor := termbox.ColorDefault
+		bgAttr := termbox.ColorDefault
 
 		if y == t.yabs-t.ybase {
-			bgcolor = termbox.ColorWhite
+			bgAttr = termbox.AttrReverse
 		}
 
 		str_raw := replaceAnsiCode(str)
-		drawLine(str_raw, bgcolor, y)
+		drawLine(str_raw, bgAttr, y)
 	}
 
 	termbox.Flush()
