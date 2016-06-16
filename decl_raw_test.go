@@ -56,13 +56,13 @@ static struct ccchar *baz ( char *i, struct *tree ) {
 	file.Write([]byte(source))
 
 	decls := Decls{
-		Decl{6, clang.Cursor_FunctionDecl, "hoge"},
-		Decl{15, clang.Cursor_FunctionDecl, "get_human"},
-		Decl{35, clang.Cursor_FunctionDecl, "baz"},
+		Decl{6, clang.Cursor_FunctionDecl, "hoge", ""},
+		Decl{15, clang.Cursor_FunctionDecl, "get_human", ""},
+		Decl{35, clang.Cursor_FunctionDecl, "baz", ""},
 	}
 
 	trace := Trace{}
-	if reflect.DeepEqual(decls, trace.getDeclsByRaw(".tmp")) {
+	if !reflect.DeepEqual(decls, trace.getDeclsByRaw(".tmp")) {
 		t.Errorf("Failed.")
 	}
 
