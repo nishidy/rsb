@@ -170,7 +170,7 @@ func (t *Trace) getDeclsByRaw(path string) Decls {
 				if isNotFunc(real_ln) {
 					reset(&decl_slice)
 				} else {
-					decl_slice = append(decl_slice, real_ln)
+					decl_slice = append(decl_slice, strings.TrimSpace(real_ln))
 				}
 			}
 
