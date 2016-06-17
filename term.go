@@ -125,7 +125,7 @@ func (t *Term) draw() {
 
 		if y == t.yabs-t.ybase && t.showHead {
 			show_head = 1
-			drawAHead(strings.Repeat(" ", t.levels[y]-1)+t.heads[y], termbox.ColorDefault, y+show_head)
+			drawAHead(strings.Repeat(" ", t.levels[t.yabs]-1)+t.heads[t.yabs], termbox.ColorDefault, y+show_head)
 		}
 	}
 
@@ -153,6 +153,9 @@ func (t *Term) Run() {
 					// 1 : index which starts from 0
 					// 2 : the first line is title
 					height -= 2
+					if t.showHead {
+						height -= 1
+					}
 					if height < t.yabs-t.ybase {
 						t.ybase += 1
 					}
