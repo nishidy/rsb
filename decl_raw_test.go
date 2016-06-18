@@ -48,6 +48,20 @@ static struct ccchar *baz ( char *i, struct *tree ) {
 		return "x";
 	}
 }
+
+struct *st f(struct s* _s) {
+	if() { /* aaa
+		*/
+		if() { /* bbb
+			*/
+			if() { /* ccc
+			*/
+				if() {
+				}
+			}
+		}
+	}
+}
 `
 
 	file, err := os.Create(tmp)
@@ -60,6 +74,7 @@ static struct ccchar *baz ( char *i, struct *tree ) {
 		Decl{6, clang.Cursor_FunctionDecl, "hoge", "int hoge(int i, int *j) {"},
 		Decl{15, clang.Cursor_FunctionDecl, "get_human", "struct human *get_human() {"},
 		Decl{37, clang.Cursor_FunctionDecl, "baz", "static struct ccchar *baz ( char *i, struct *tree ) {"},
+		Decl{51, clang.Cursor_FunctionDecl, "f", "struct *st f(struct s* _s) {"},
 	}
 
 	trace := Trace{}
