@@ -51,12 +51,11 @@ static struct ccchar *baz ( char *i, struct *tree ) {
 
 struct *st f(struct s* _s) {
 	if() { /* aaa
-		*/
-		if() { /* bbb
+		*/ if() { /* bbb
 			*/
 			if() { /* ccc
-			*/
-				if() {
+			*/ if() {
+				if() { if () { } }
 				}
 			}
 		}
@@ -74,7 +73,7 @@ struct *st f(struct s* _s) {
 		Decl{6, clang.Cursor_FunctionDecl, "hoge", "int hoge(int i, int *j) {"},
 		Decl{15, clang.Cursor_FunctionDecl, "get_human", "struct human *get_human() {"},
 		Decl{37, clang.Cursor_FunctionDecl, "baz", "static struct ccchar *baz ( char *i, struct *tree ) {"},
-		Decl{51, clang.Cursor_FunctionDecl, "f", "struct *st f(struct s* _s) {"},
+		Decl{50, clang.Cursor_FunctionDecl, "f", "struct *st f(struct s* _s) {"},
 	}
 
 	trace := Trace{}
