@@ -13,3 +13,8 @@ $ bt ENTRYFILE ENTRYLINE ROOTDIR MAXBACKTRACELEVEL
 Necessary to install go-clang/bootstrap.
 
 https://github.com/go-clang/bootstrap
+
+# Note
+
+Currently, clang is only used for variable definitions. It is ToDo as of now to implement clang for totally safe tracing. In addition to that, directives are not treated properly.
+
